@@ -59,9 +59,9 @@ This Node-RED and Part-DB based tool is a sophisticated inventory management sys
 This tool combines hardware (LED strips) with software (Node-RED flows) to create a powerful, user-friendly inventory management solution that can significantly improve operational efficiency in various storage and retrieval scenarios.
 
 Links:
-Part-DB - https://github.com/Part-DB/Part-DB-server
-Node-Red - https://nodered.org
-ViolentMonkey - https://violentmonkey.github.io
+Part-DB - https://github.com/Part-DB/Part-DB-server  
+Node-Red - https://nodered.org  
+ViolentMonkey - https://violentmonkey.github.io  
 
 # 3. Setup & Requirements
 - Linux System
