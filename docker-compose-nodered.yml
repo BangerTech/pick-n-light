@@ -1,0 +1,25 @@
+services:
+  node-red:
+    image: nodered/node-red:latest
+    container_name: node-red
+    user: "0"
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Berlin
+
+    ports:
+      - "8035:1880"
+    volumes:
+      - ./nodered-data:/data
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.nodered.rule=Host(`YOURWEBSITE`)
+      - traefik.http.routers.nodered.tls=true
+      - traefik.http.routers.nodered.tls.certresolver=cloudflare
+      - traefik.http.services.nodered.loadbalancer.server.scheme=http
+      - traefik.http.services.nodered.loadbalancer.server.port=8035
+    networks:
+      - proxy
+networks:
+  proxy:
+    external: true

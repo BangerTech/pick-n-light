@@ -1,0 +1,41 @@
+services:
+
+  partdb:
+    container_name: partdb
+    ports:
+      - '8034:80'
+    volumes:
+      - ./uploads:/var/www/html/uploads
+      - ./public_media:/var/www/html/public/media
+      - ./db:/var/www/html/var/db
+    restart: unless-stopped
+    image: jbtronics/part-db1:latest
+    environment:
+     # - DATABASE_URL=sqlite:///%kernel.project_dir%/var/db/app.db
+     # - DATABASE_URL=mysql://partdb:root@mariadb:3306/partdb
+      - APP_ENV=docker
+      - DEFAULT_LANG=de
+      - DEFAULT_TIMEZONE=Europe/Berlin
+      - BASE_CURRENCY=EUR
+      - INSTANCE_NAME=Pick´n´Light
+      - ALLOW_ATTACHMENT_DOWNLOADS=0
+      - USE_GRAVATAR=0
+      - DEFAULT_URI=https://YOURWEBSITE
+      - BANNER=Pick´n´Light<br>This will get you sorted
+      - TRUSTED_PROXIES=192.168.1.55,192.168.1.182 
+    labels:
+      - traefik.http.middlewares.csp-header.headers.customResponseHeaders.Content-Security-Policy=default-src 'self'; connect-src 'self' https://YOURWEBSITE
+      - traefik.http.routers.parts.middlewares=csp-header@redis
+      - traefik.enable=true
+      - traefik.http.routers.parts.rule=Host(`YOURWEBSITE`)
+      - traefik.http.routers.parts.tls=true
+      - traefik.http.routers.parts.tls.certresolver=cloudflare
+      - traefik.http.services.parts.loadbalancer.server.scheme=http
+      - traefik.http.services.parts.loadbalancer.server.port=8034
+
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
