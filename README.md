@@ -14,7 +14,7 @@
 
 # 2. What is this?
 
-This Node-RED based tool is a sophisticated inventory management system that integrates with LED strips to create a "Pick and Light" solution. It's designed to streamline inventory tracking and item location in warehouses or storage facilities.
+This Node-RED and Part-DB based tool is a sophisticated inventory management system that integrates with LED strips to create a "Pick and Light" solution. It's designed to streamline inventory tracking and item location in warehouses or storage facilities.
 
 ### Key Features
 
@@ -57,6 +57,11 @@ This Node-RED based tool is a sophisticated inventory management system that int
 - **Integration**: Easily integrates with existing inventory management systems.
 
 This tool combines hardware (LED strips) with software (Node-RED flows) to create a powerful, user-friendly inventory management solution that can significantly improve operational efficiency in various storage and retrieval scenarios.
+
+Links:
+Part-DB - https://github.com/Part-DB/Part-DB-server
+Node-Red - https://nodered.org
+ViolentMonkey - https://violentmonkey.github.io
 
 # 3. Setup & Requirements
 - Linux System
