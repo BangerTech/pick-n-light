@@ -64,7 +64,7 @@ Node-Red - https://nodered.org
 ViolentMonkey - https://violentmonkey.github.io  
 
 # 3. Setup & Requirements
-- Linux System
+- ViolentMonkey Browser Extension
 - Docker and Docker Compose installed
 - MQTT Broker
 - If you want to use a Reverse Proxy like i do with Traefik it should be up and running
