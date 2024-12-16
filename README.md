@@ -5,10 +5,10 @@
 
 # 1. Table of content
 - [1. Table of content](#1-table-of-content)
-- [2. What is this Plugin?](#2-what-is-this-plugin)
-- [3. Setup](#3-setup)
-- [4. How to use it?](#5-how-to-use-it)
-- [5. Support / Feedback](#4-support--feedback)
+- [2. What is this?](#2-what-is-this)
+- [3. Setup & Requirements](#3-setup--requirements)
+- [4. How to use it?](#4-how-to-use-it)
+- [5. Support / Feedback](#5-support--feedback)
 - [6. How to contribute?](#6-how-to-contribute)
 - [7. Sponsor me!](#7-how-to-sponsor)
 
