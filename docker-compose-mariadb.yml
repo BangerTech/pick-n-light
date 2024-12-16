@@ -1,0 +1,21 @@
+services:
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=partdb
+      - MYSQL_USER=partdb
+      - MYSQL_PASSWORD=root
+    volumes:
+      - ./mariadb-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - proxy
+
+
+networks:
+  proxy:
+    external: true
