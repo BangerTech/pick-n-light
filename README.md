@@ -61,10 +61,10 @@ This tool combines hardware (LED strips) with software (Node-RED flows) to creat
 # 3. Setup & Requirements
 - Linux System
 - Docker and Docker Compose installed
+- MQTT Broker
 - If you want to use a Reverse Proxy like i do with Traefik it should be up and running
 - create a new Subdomain for example parts.yourwebsite.com
 - ESP32 or ESP8266 (https://amzn.to/41AD0Oo) with WLED installed
-- MQTT Broker
 - WS2812B LED Strip (https://amzn.to/49HctAZ)
 - Part Magazine (https://amzn.to/4gi3Gbj)
 
