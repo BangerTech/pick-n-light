@@ -1,5 +1,7 @@
 # Pick´n´Light
 
+<img width="1145" alt="Bildschirmfoto 2024-12-19 um 17 05 08" src="https://github.com/user-attachments/assets/733f8e33-b7e7-4d53-9e51-0aaddd43e984" />
+
 ![Bildschirmfoto 2024-12-16 um 09 18 44](https://github.com/user-attachments/assets/0564ff97-ed78-40d9-92aa-f16844954e25)
 
 
