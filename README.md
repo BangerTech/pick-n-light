@@ -9,7 +9,10 @@
 </div>
 
 <div align="center">
-    <a href="https://github.com/user-attachments/assets/3324db84-107d-4b32-bcaf-ac771f014775">Video ansehen</a>
+    <video width="400" controls>
+        <source src="https://github.com/user-attachments/assets/3324db84-107d-4b32-bcaf-ac771f014775" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
 </div>
 
 # 1. Table of content
