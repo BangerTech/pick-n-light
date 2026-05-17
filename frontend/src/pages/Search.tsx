@@ -7,13 +7,6 @@ import { useAppStore } from '@/store';
 import type { SearchResult } from '@/lib/types';
 import { cn, isLowStock, formatQuantity } from '@/lib/utils';
 
-// Web Speech API type declarations (not in all TS lib versions)
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
-  }
-}
 
 function parseRgb(str: string | undefined): [number, number, number] {
   if (!str) return [245, 158, 11];
