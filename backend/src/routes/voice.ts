@@ -1,9 +1,59 @@
 import { Router, Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../db';
 import { lightSlot, blinkAllRed } from '../services/wled';
 import { totalLedCount } from '../services/ledCalculator';
 
 const router = Router();
+
+function normalizeQ(raw: string): string {
+  return raw.replace(/(\d)\s*[×x*]\s*(\d)/g, '$1x$2').trim();
+}
+
+function termVariants(term: string): string[] {
+  const norm = normalizeQ(term);
+  const cross = norm.replace(/(\d)x(\d)/g, '$1×$2');
+  return [...new Set([norm, cross, term.trim()].filter(Boolean))];
+}
+
+async function findParts(q: string, take = 5) {
+  const words = q.split(/\s+/).filter(w => w.length >= 1);
+
+  const wordConditions = words.map((word) => {
+    const variants = termVariants(word);
+    const subConds = variants.flatMap((v) => {
+      const like = `%${v}%`;
+      return [
+        Prisma.sql`p.name ILIKE ${like}`,
+        Prisma.sql`p.description ILIKE ${like}`,
+        Prisma.sql`EXISTS (SELECT 1 FROM unnest(p.tags) t WHERE t ILIKE ${like})`,
+      ];
+    });
+    return Prisma.sql`(${Prisma.join(subConds, ' OR ')})`;
+  });
+
+  const whereClause = Prisma.join(wordConditions, ' AND ');
+
+  const rows = await prisma.$queryRaw<{ id: number }[]>`
+    SELECT DISTINCT p.id FROM "parts" p
+    WHERE ${whereClause}
+    LIMIT ${take}
+  `;
+
+  if (rows.length === 0) return [];
+
+  return prisma.part.findMany({
+    where: { id: { in: rows.map((r) => r.id) } },
+    include: {
+      slot: {
+        include: {
+          magazine: { include: { wledDevices: true } },
+        },
+      },
+    },
+    take,
+  });
+}
 
 router.post('/search', async (req: Request, res: Response) => {
   try {
@@ -23,25 +73,9 @@ router.post('/search', async (req: Request, res: Response) => {
       return;
     }
 
-    const q = query.trim();
+    const q = normalizeQ(query.trim());
 
-    const results = await prisma.part.findMany({
-      where: {
-        OR: [
-          { name: { contains: q, mode: 'insensitive' } },
-          { description: { contains: q, mode: 'insensitive' } },
-          { tags: { has: q } },
-        ],
-      },
-      include: {
-        slot: {
-          include: {
-            magazine: { include: { wledDevices: true } },
-          },
-        },
-      },
-      take: 5,
-    });
+    const results = await findParts(q);
 
     if (results.length === 0) {
       const allDevices = await prisma.wledDevice.findMany({ include: { magazine: true } });
@@ -108,6 +142,7 @@ router.post('/search', async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
+    console.error('Voice search error:', err);
     res.status(500).json({ error: 'Voice search failed' });
   }
 });

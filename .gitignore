@@ -1,6 +1,9 @@
 # Docker Compose (enthält persönliche Konfiguration / Traefik-Labels)
 docker-compose.yml
 
+# Interne Projektdokumentation (zu viele Interna für GitHub)
+picknlight.md
+
 # Environment
 .env
 .env.local

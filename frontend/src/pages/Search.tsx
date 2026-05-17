@@ -58,25 +58,52 @@ function parseGermanWord(word: string): number | null {
 }
 
 /**
+ * Normalize a query string for the API — used for both typed and voice input.
+ * Handles ×, x, * as multiplication signs and collapses surrounding spaces.
+ */
+export function normalizeQuery(raw: string): string {
+  return raw
+    .replace(/(\d)\s*[×x*]\s*(\d)/g, '$1x$2')  // × / x / * between digits → x
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
  * Converts spoken German part names to technical notation.
  *
  * Examples:
  *   "M vier mal zwanzig"            → "M4x20"
  *   "vier mal fünfundzwanzig"       → "4x25"
- *   "M drei mal zwölf Senkkopf"     → "M3x12 Senkkopf"
- *   "hundert Mikrofarad"            → "100 Mikrofarad"
- *   "zehn Kilo Ohm"                 → "10 Kilo Ohm"
+ *   "4 × 25"  (Unicode ×, browser) → "4x25"
+ *   "4 * 25"  (asterisk)           → "4x25"
+ *   "4er Holzschraube"             → "4 Holzschraube"
+ *   "M drei mal zwölf Senkkopf"    → "M3x12 Senkkopf"
  */
 function normalizeTranscript(raw: string): string {
   let text = raw.trim();
 
-  // 1. Replace compound number words ("zweiundvierzig", "zweihundert", ...)
+  // 1. Normalize ×, x, * between digits — browsers often return "4 × 25"
+  text = text.replace(/(\d)\s*[×x*]\s*(\d)/g, '$1x$2');
+
+  // 2a. German number word + "-er" suffix → digit
+  //     Uses parseGermanWord to handle ALL number words automatically — no hardcoded list needed.
+  //     "Vierer" → base "Vier" → 4, "Zwanziger" → 20, "Zweiundvierziger" → 42
+  //     False positives avoided: "Schrauber"→base "Schraub"→null→unchanged
+  text = text.replace(/\b([a-zäöüß]+)er\b/gi, (match, base) => {
+    const n = parseGermanWord(base);
+    return n !== null ? String(n) : match;
+  });
+
+  // 2b. Digit + "-er" suffix: "4er" → "4", "6er" → "6"
+  text = text.replace(/\b(\d+)er\b/gi, '$1');
+
+  // 3. Replace compound number words ("zweiundvierzig", "zweihundert", ...)
   text = text.replace(/\b([a-zäöüß]{4,}und[a-zäöüß]+|[a-zäöüß]+hundert[a-zäöüß]*)\b/gi, (m) => {
     const n = parseGermanWord(m);
     return n !== null ? String(n) : m;
   });
 
-  // 2. Replace simple German number words
+  // 4. Replace simple German number words
   const numWordPattern =
     /\b(null|eins?|eine[mnrs]?|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|dreizehn|vierzehn|fünfzehn|sechzehn|siebzehn|achtzehn|neunzehn|zwanzig|dreißig|vierzig|fünfzig|sechzig|siebzig|achtzig|neunzig|hundert|tausend)\b/gi;
   text = text.replace(numWordPattern, (m) => {
@@ -84,14 +111,16 @@ function normalizeTranscript(raw: string): string {
     return n !== null ? String(n) : m;
   });
 
-  // 3. "4 mal 20" → "4x20", "M 4 mal 20" keeps M prefix
+  // 5. "4 mal 20" → "4x20"
   text = text.replace(/(\d)\s+mal\s+(\d)/gi, '$1x$2');
 
-  // 4. Collapse letter-prefix + space + number: "M 4" → "M4", "R 10" → "R10"
-  //    Only single uppercase letters used as component prefixes
+  // 6. Re-apply after number word substitution
+  text = text.replace(/(\d)\s*[×x*]\s*(\d)/g, '$1x$2');
+
+  // 7. Collapse letter-prefix + space + number: "M 4" → "M4"
   text = text.replace(/\b([A-Z])\s+(\d)/g, '$1$2');
 
-  // 5. Normalize remaining whitespace
+  // 8. Normalize whitespace
   text = text.replace(/\s{2,}/g, ' ').trim();
 
   return text;
@@ -143,10 +172,12 @@ export default function Search() {
         setHighlightedSlotId(null);
         return;
       }
+      // Normalize ×, *, spaces around x for typed queries too
+      const normalized = normalizeQuery(q);
       setIsSearching(true);
       setSearched(true);
       try {
-        const res = await api.search.query(q);
+        const res = await api.search.query(normalized);
         setResults(res);
         if (res.length === 0) {
           triggerNotFoundBlink();
