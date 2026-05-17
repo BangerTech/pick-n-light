@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Magazine {
+  id             Int          @id @default(autoincrement())
+  name           String
+  rows           Int
+  columns        Int
+  ledsPerSlot    Int          @default(3) @map("leds_per_slot")
+  ledGap         Int          @default(0) @map("led_gap")
+  serpentine     Boolean      @default(false)
+  stripOrigin    String       @default("top-left") @map("strip_origin")
+  bottomRowLarge Boolean      @default(false) @map("bottom_row_large")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  slots          Slot[]
+  wledDevices    WledDevice[]
+
+  @@map("magazines")
+}
+
+model Slot {
+  id         Int      @id @default(autoincrement())
+  magazineId Int      @map("magazine_id")
+  magazine   Magazine @relation(fields: [magazineId], references: [id], onDelete: Cascade)
+  row        Int
+  col        Int
+  ledStart   Int      @map("led_start")
+  ledCount   Int      @map("led_count")
+  isLarge    Boolean  @default(false) @map("is_large")
+  part       Part?
+
+  @@unique([magazineId, row, col])
+  @@map("slots")
+}
+
+model Part {
+  id          Int      @id @default(autoincrement())
+  slotId      Int      @unique @map("slot_id")
+  slot        Slot     @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  quantity    Float    @default(0)
+  unit        String   @default("Stk")
+  minQuantity Float?   @map("min_quantity")
+  tags        String[]
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("parts")
+}
+
+model WledDevice {
+  id         Int      @id @default(autoincrement())
+  magazineId Int      @map("magazine_id")
+  magazine   Magazine @relation(fields: [magazineId], references: [id], onDelete: Cascade)
+  name       String
+  ipAddress  String?  @map("ip_address")
+  mqttTopic  String   @map("mqtt_topic")
+  ledCount   Int      @map("led_count")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("wled_devices")
+}
+
+model Setting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+
+  @@map("settings")
+}
