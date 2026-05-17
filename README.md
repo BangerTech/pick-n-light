@@ -20,7 +20,11 @@
 
 <p align="center">
   <strong>Magazine Dashboard</strong><br>
-  <img src="docs/screenshot-dashboard.png" alt="Pick·n·Light Dashboard" width="85%">
+  <img src="docs/dashboard.png" alt="Pick·n·Light Dashboard" width="85%">
+  <br/><br/>
+  <img src="docs/search.png" alt="Pick·n·Light Teilsuche" width="85%">
+  <br/><br/>
+  <img src="docs/settings.png" alt="Pick·n·Light Einstellungen" width="85%">
 </p>
 
 ---
