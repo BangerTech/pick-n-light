@@ -1,0 +1,124 @@
+# Pick·n·Light — Home Assistant Integration
+#
+# SETUP:
+# 1. Ersetze 'http://picknlight:7050' mit deiner tatsächlichen URL
+#    (IP, Hostname oder Domain — je nach HA-Netzwerk-Konfiguration)
+# 2. Füge die gewünschten Blöcke in deine configuration.yaml ein
+#    (oder die jeweiligen Split-Dateien: rest_command.yaml, scripts.yaml, automations.yaml)
+# 3. Home Assistant neu starten oder Konfiguration neu laden
+
+# ─────────────────────────────────────────────────────────
+# 1. REST COMMAND (in configuration.yaml oder rest_command.yaml)
+# ─────────────────────────────────────────────────────────
+rest_command:
+  picknlight_search:
+    url: "http://picknlight:7050/api/voice/search"
+    method: POST
+    content_type: "application/json"
+    payload: '{"query": "{{ query }}"}'
+
+# ─────────────────────────────────────────────────────────
+# 2. INPUT TEXT (Eingabefeld für die Suche in der UI)
+#    In configuration.yaml oder input_text.yaml
+# ─────────────────────────────────────────────────────────
+input_text:
+  picknlight_query:
+    name: "Pick·n·Light Suche"
+    icon: mdi:led-on
+    max: 100
+
+# ─────────────────────────────────────────────────────────
+# 3. SCRIPT (manuell auslösbares Skript)
+#    In configuration.yaml oder scripts.yaml
+# ─────────────────────────────────────────────────────────
+script:
+  picknlight_suche:
+    alias: "Pick·n·Light: Teil suchen"
+    icon: mdi:led-on
+    fields:
+      query:
+        description: "Suchbegriff (z.B. 'M4x20 Schraube')"
+        required: true
+        example: "M4x20 Schraube"
+        selector:
+          text:
+    sequence:
+      - service: rest_command.picknlight_search
+        data:
+          query: "{{ query }}"
+
+  picknlight_suche_aus_input:
+    alias: "Pick·n·Light: Teil suchen (aus Eingabefeld)"
+    icon: mdi:magnify
+    sequence:
+      - service: rest_command.picknlight_search
+        data:
+          query: "{{ states('input_text.picknlight_query') }}"
+
+# ─────────────────────────────────────────────────────────
+# 4. AUTOMATIONS (Beispiele)
+#    In automations.yaml (ohne 'automation:' Wrapper wenn split)
+# ─────────────────────────────────────────────────────────
+automation:
+
+  # Automatische Suche wenn sich der input_text ändert (mit 1s Debounce)
+  - alias: "Pick·n·Light: Auto-Suche bei Eingabe"
+    id: picknlight_auto_search_on_input
+    trigger:
+      - platform: state
+        entity_id: input_text.picknlight_query
+        for:
+          seconds: 1
+    condition:
+      - condition: template
+        value_template: "{{ states('input_text.picknlight_query') | length > 1 }}"
+    action:
+      - service: rest_command.picknlight_search
+        data:
+          query: "{{ states('input_text.picknlight_query') }}"
+
+  # Sprachassistent-Trigger (Assist / Conversation)
+  # Erfordert: HA Assist mit custom sentences oder einem custom intent
+  # Beispiel-Sentence in custom_sentences/de/picknlight.yaml:
+  #   language: de
+  #   intents:
+  #     PicknLightSearch:
+  #       data:
+  #         - sentences:
+  #             - "suche [nach] {query} in pick n light"
+  #             - "wo ist {query}"
+  #             - "find {query}"
+  - alias: "Pick·n·Light: Sprachbefehl via Assist"
+    id: picknlight_voice_assist
+    trigger:
+      - platform: conversation
+        command:
+          - "suche [nach] {query} in pick n light"
+          - "where is {query} pick n light"
+          - "finde {query} pick n light"
+    action:
+      - service: rest_command.picknlight_search
+        data:
+          query: "{{ trigger.slots.query }}"
+      - set_conversation_response: >
+          {% set query = trigger.slots.query %}
+          Suche nach {{ query }} wurde gestartet. Das LED-Fach leuchtet auf.
+
+# ─────────────────────────────────────────────────────────
+# 5. LOVELACE CARD (Beispiel für dashboard/ui-lovelace.yaml)
+# ─────────────────────────────────────────────────────────
+# Füge diese Card in dein Lovelace-Dashboard ein:
+#
+# type: vertical-stack
+# cards:
+#   - type: entities
+#     title: Pick·n·Light Suche
+#     entities:
+#       - entity: input_text.picknlight_query
+#         name: Suchbegriff
+#   - type: button
+#     name: Teil suchen & LED aufleuchten
+#     icon: mdi:led-on
+#     tap_action:
+#       action: call-service
+#       service: script.picknlight_suche_aus_input

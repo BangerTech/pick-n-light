@@ -14,12 +14,22 @@ LED-geführtes Teilemagazin-System mit moderner Web-UI, MQTT-Broker und WLED-Int
 ## Setup
 
 ```bash
+# Einfaches Setup (ohne Traefik):
+cp docker-compose.example.yml docker-compose.yml
+
+# Mit Traefik (Domain + TLS):
+cp docker-compose.traefik.example.yml docker-compose.yml
+# Dann in docker-compose.yml YOUR_DOMAIN.com und certresolver ersetzen
+
 cp .env.example .env
 # .env anpassen (POSTGRES_PASSWORD, etc.)
 docker compose up -d
 # Beim ersten Start: DB-Migration läuft automatisch
 # Dann http://localhost:7050 öffnen → Onboarding-Wizard startet
 ```
+
+> **Hinweis:** `docker-compose.yml` ist in `.gitignore` — sie enthält deine persönliche Konfiguration.
+> Auf GitHub liegen nur die Beispiel-Dateien `docker-compose.example.yml` und `docker-compose.traefik.example.yml`.
 
 ## Umgebungsvariablen (.env)
 
@@ -216,19 +226,36 @@ Das macht den Code unabhängig von der exakten LED-Anzahl für Hintergrund-Segme
 
 ## Voice Integration
 
+### Browser — Web Speech API (nativ)
+Der Mikrofon-Button in der Suche nutzt die Web Speech API direkt im Browser — kein Plugin, kein Setup.
+
+- **Unterstützte Browser:** Chrome, Edge, Safari (Android & Desktop)
+- **Nicht unterstützt:** Firefox (kein Web Speech API)
+- **Sprache:** `de-DE` (fest eingestellt)
+- **Ablauf:** Klick → Aufnahme startet → Zwischenergebnis wird im Suchfeld angezeigt (gedimmt) → finales Ergebnis löst Suche aus → LEDs leuchten auf
+- **Stoppen:** Nochmaliger Klick auf den (jetzt roten) Mic-Button
+
 ### Alexa Custom Skill
-Erstelle einen Custom Skill mit einem `SearchIntent` und `{query}` Slot.
-Der Skill-Endpoint ruft auf: `POST https://your-domain.com/api/voice/search`
+Importierbares Intent-Schema: `docs/alexa-skill.json`
+
+Kurzanleitung:
+1. [Alexa Developer Console](https://developer.amazon.com/alexa/console/ask) → Create Skill → Custom
+2. Interaction Model → JSON Editor → Inhalt aus `docs/alexa-skill.json` einfügen (nur `interactionModel`-Block)
+3. Endpoint: HTTPS → `https://YOUR_DOMAIN.com/api/voice/search`
+4. Build Model → Test: *"Alexa, frag pick n light wo ist M4x20 Schraube"*
+
+Der Endpoint gibt direkt eine Alexa-kompatible JSON-Response zurück (Feld `alexa.response.outputSpeech`).
 
 ### Home Assistant
-```yaml
-rest_command:
-  picknlight_search:
-    url: "http://picknlight:7050/api/voice/search"
-    method: POST
-    content_type: "application/json"
-    payload: '{"query": "{{ query }}"}'
-```
+Vollständige Vorlage mit Beispielen: `docs/homeassistant.yaml`
+
+Enthält:
+- `rest_command.picknlight_search` — direkter HTTP-Webhook
+- `input_text.picknlight_query` — Eingabefeld für das Dashboard
+- `script.picknlight_suche` — manuell auslösbares Skript mit Parameterfeld
+- Automation: Auto-Suche bei Eingabe (1 s Debounce)
+- Automation: Sprachbefehl via HA Assist / Conversation
+- Lovelace Card Beispiel
 
 ## LED-Berechnung
 
@@ -285,6 +312,15 @@ buildHighlightTheme("0,255,0")
 
 ---
 
+## Projektdateien (Docs)
+
+| Datei | Beschreibung |
+|---|---|
+| `docker-compose.example.yml` | Setup ohne Traefik (nur Port-Mapping) |
+| `docker-compose.traefik.example.yml` | Setup mit Traefik (Platzhalter für Domain/certresolver) |
+| `docs/alexa-skill.json` | Alexa Intent-Schema (direkt importierbar in Developer Console) |
+| `docs/homeassistant.yaml` | HA-Integration: rest_command, input_text, scripts, automations, Lovelace |
+
 ## Changelog
 
 - **2026-05-17** – Initiales Setup, vollständige Implementierung
@@ -299,3 +335,6 @@ buildHighlightTheme("0,255,0")
 - **2026-05-17** – Bugfix: Highlight-Farbe jetzt dynamisch aus `search_highlight_color` Setting (nicht mehr hardcoded amber)
 - **2026-05-17** – Bugfix: `highlightedSlotId` wird beim Verlassen der Suchseite automatisch bereinigt (kein manueller Reload nötig)
 - **2026-05-17** – Kontrastverbesserung: Dark-Theme komplett überarbeitet für WCAG-konforme Lesbarkeit (Hintergrundpalette, Textebenen, Borders, Oberflächenstruktur)
+- **2026-05-17** – Security: `docker-compose.yml` in `.gitignore` (enthält persönliche Traefik-Labels); Beispiel-Dateien `docker-compose.example.yml` und `docker-compose.traefik.example.yml` hinzugefügt
+- **2026-05-17** – Voice: Nativer Mikrofon-Button mit Web Speech API implementiert (Chrome/Edge/Safari, `de-DE`, Interim-Ergebnisse, visuelles Feedback, Fallback bei nicht unterstützten Browsern)
+- **2026-05-17** – Docs: `docs/alexa-skill.json` (importierbares Alexa Intent-Schema) und `docs/homeassistant.yaml` (vollständige HA-Integration) hinzugefügt

@@ -1,3 +1,6 @@
+# Docker Compose (enthält persönliche Konfiguration / Traefik-Labels)
+docker-compose.yml
+
 # Environment
 .env
 .env.local

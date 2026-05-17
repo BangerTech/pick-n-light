@@ -1,0 +1,60 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "pick n light",
+      "intents": [
+        {
+          "name": "SearchIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "suche nach {query}",
+            "finde {query}",
+            "wo ist {query}",
+            "zeig mir {query}",
+            "ich suche {query}",
+            "leuchte {query} an",
+            "{query}"
+          ]
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        }
+      ],
+      "types": []
+    }
+  },
+  "_comment_setup": [
+    "ANLEITUNG: Alexa Custom Skill für Pick·n·Light",
+    "",
+    "1. Gehe zu https://developer.amazon.com/alexa/console/ask",
+    "2. Klicke auf 'Create Skill'",
+    "3. Name: 'Pick n Light' (oder beliebig), Modell: Custom, Hosted: Dein eigener Endpoint",
+    "4. Wähle unter 'Interaction Model' → 'JSON Editor' und füge den Inhalt von 'interactionModel' ein",
+    "5. Unter 'Endpoint': HTTPS → trage deine URL ein:",
+    "   https://YOUR_DOMAIN.com/api/voice/search",
+    "   (SSL-Zertifikat: 'My development endpoint is a sub-domain of a domain...' wenn Let's Encrypt)",
+    "6. Speichern & Build Model",
+    "7. Test: 'Alexa, frag pick n light wo ist M4x20 Schraube'",
+    "",
+    "HINWEIS: Der Endpoint /api/voice/search gibt direkt eine Alexa-kompatible JSON-Antwort zurück.",
+    "Das 'alexa'-Feld in der Response wird von Alexa automatisch als Sprachausgabe verwendet."
+  ]
+}

@@ -1,16 +1,107 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search as SearchIcon, X, Zap, Package, MapPin, AlertTriangle, Mic } from 'lucide-react';
+import { Search as SearchIcon, X, Zap, Package, MapPin, AlertTriangle, Mic, MicOff } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAppStore } from '@/store';
 import type { SearchResult } from '@/lib/types';
 import { cn, isLowStock, formatQuantity } from '@/lib/utils';
 
+// Web Speech API type declarations (not in all TS lib versions)
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
+
 function parseRgb(str: string | undefined): [number, number, number] {
   if (!str) return [245, 158, 11];
   const parts = str.split(',').map((s) => parseInt(s.trim(), 10));
   return [parts[0] ?? 245, parts[1] ?? 158, parts[2] ?? 11];
+}
+
+function getSpeechRecognitionClass(): typeof SpeechRecognition | null {
+  if (typeof window === 'undefined') return null;
+  return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
+}
+
+// ─── German number → digit conversion ────────────────────────────────────────
+
+const GERMAN_ONES: Record<string, number> = {
+  null: 0, ein: 1, eins: 1, eine: 1, einem: 1, einen: 1, einer: 1, eines: 1,
+  zwei: 2, drei: 3, vier: 4, fünf: 5, sechs: 6, sieben: 7, acht: 8, neun: 9,
+  zehn: 10, elf: 11, zwölf: 12, dreizehn: 13, vierzehn: 14, fünfzehn: 15,
+  sechzehn: 16, siebzehn: 17, achtzehn: 18, neunzehn: 19,
+  zwanzig: 20, dreißig: 30, vierzig: 40, fünfzig: 50,
+  sechzig: 60, siebzig: 70, achtzig: 80, neunzig: 90,
+  hundert: 100, tausend: 1000,
+};
+
+function parseGermanWord(word: string): number | null {
+  const lower = word.toLowerCase();
+  if (GERMAN_ONES[lower] !== undefined) return GERMAN_ONES[lower];
+
+  // Compound: "zweiundvierzig" → 42, "einundzwanzig" → 21
+  const andMatch = lower.match(/^([a-zäöüß]+)und([a-zäöüß]+)$/);
+  if (andMatch) {
+    const onesVal = parseGermanWord(andMatch[1]);
+    const tensVal = parseGermanWord(andMatch[2]);
+    if (onesVal !== null && tensVal !== null && onesVal < 10 && tensVal >= 20)
+      return tensVal + onesVal;
+  }
+
+  // Hundreds: "zweihundert" → 200, "dreihundertfünfzig" → 350
+  const hundredMatch = lower.match(/^([a-zäöüß]+)hundert([a-zäöüß]*)$/);
+  if (hundredMatch) {
+    const multiplier = parseGermanWord(hundredMatch[1]);
+    if (multiplier !== null && multiplier < 10) {
+      const remainder = hundredMatch[2] ? parseGermanWord(hundredMatch[2]) : 0;
+      if (remainder !== null) return multiplier * 100 + remainder;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Converts spoken German part names to technical notation.
+ *
+ * Examples:
+ *   "M vier mal zwanzig"            → "M4x20"
+ *   "vier mal fünfundzwanzig"       → "4x25"
+ *   "M drei mal zwölf Senkkopf"     → "M3x12 Senkkopf"
+ *   "hundert Mikrofarad"            → "100 Mikrofarad"
+ *   "zehn Kilo Ohm"                 → "10 Kilo Ohm"
+ */
+function normalizeTranscript(raw: string): string {
+  let text = raw.trim();
+
+  // 1. Replace compound number words ("zweiundvierzig", "zweihundert", ...)
+  text = text.replace(/\b([a-zäöüß]{4,}und[a-zäöüß]+|[a-zäöüß]+hundert[a-zäöüß]*)\b/gi, (m) => {
+    const n = parseGermanWord(m);
+    return n !== null ? String(n) : m;
+  });
+
+  // 2. Replace simple German number words
+  const numWordPattern =
+    /\b(null|eins?|eine[mnrs]?|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|dreizehn|vierzehn|fünfzehn|sechzehn|siebzehn|achtzehn|neunzehn|zwanzig|dreißig|vierzig|fünfzig|sechzig|siebzig|achtzig|neunzig|hundert|tausend)\b/gi;
+  text = text.replace(numWordPattern, (m) => {
+    const n = parseGermanWord(m);
+    return n !== null ? String(n) : m;
+  });
+
+  // 3. "4 mal 20" → "4x20", "M 4 mal 20" keeps M prefix
+  text = text.replace(/(\d)\s+mal\s+(\d)/gi, '$1x$2');
+
+  // 4. Collapse letter-prefix + space + number: "M 4" → "M4", "R 10" → "R10"
+  //    Only single uppercase letters used as component prefixes
+  text = text.replace(/\b([A-Z])\s+(\d)/g, '$1$2');
+
+  // 5. Normalize remaining whitespace
+  text = text.replace(/\s{2,}/g, ' ').trim();
+
+  return text;
 }
 
 export default function Search() {
@@ -19,9 +110,14 @@ export default function Search() {
   const [isSearching, setIsSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [activeResultId, setActiveResultId] = useState<number | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
   const { setHighlightedSlotId, triggerNotFoundBlink } = useAppStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  const speechSupported = getSpeechRecognitionClass() !== null;
 
   const { data: settings } = useQuery({
     queryKey: ['settings'],
@@ -42,6 +138,7 @@ export default function Search() {
     return () => {
       setHighlightedSlotId(null);
       api.search.clearHighlight().catch(() => {});
+      recognitionRef.current?.abort();
     };
   }, [setHighlightedSlotId]);
 
@@ -95,6 +192,65 @@ export default function Search() {
     await api.search.highlight(result.slotId).catch(() => {});
   };
 
+  const handleMicClick = useCallback(() => {
+    const SpeechRecognitionClass = getSpeechRecognitionClass();
+    if (!SpeechRecognitionClass) return;
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const recognition = new SpeechRecognitionClass();
+    recognition.lang = 'de-DE';
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+    recognitionRef.current = recognition;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      setInterimTranscript('');
+    };
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = '';
+      let final = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+      // Show raw interim transcript (user sees what was heard before normalization)
+      if (interim) setInterimTranscript(interim);
+      if (final) {
+        // Normalize spoken German to technical notation ("vier mal zwanzig" → "4x20")
+        const normalized = normalizeTranscript(final);
+        setInterimTranscript('');
+        setQuery(normalized);
+        doSearch(normalized);
+        inputRef.current?.focus();
+      }
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+      setInterimTranscript('');
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      setInterimTranscript('');
+    };
+
+    recognition.start();
+  }, [isListening, doSearch]);
+
+  const displayQuery = isListening && interimTranscript ? interimTranscript : query;
+
   return (
     <div className="h-full flex flex-col items-center px-4 sm:px-6 py-5 sm:py-8 overflow-auto">
       {/* Header */}
@@ -121,8 +277,16 @@ export default function Search() {
             className="relative rounded-2xl overflow-hidden transition-all duration-300"
             style={{
               background: 'rgba(16,21,36,0.97)',
-              border: `1px solid ${query ? 'rgba(99,102,241,0.55)' : 'rgba(255,255,255,0.1)'}`,
-              boxShadow: query
+              border: `1px solid ${
+                isListening
+                  ? 'rgba(239,68,68,0.6)'
+                  : displayQuery
+                  ? 'rgba(99,102,241,0.55)'
+                  : 'rgba(255,255,255,0.1)'
+              }`,
+              boxShadow: isListening
+                ? '0 0 30px rgba(239,68,68,0.2), 0 8px 32px rgba(0,0,0,0.4)'
+                : displayQuery
                 ? '0 0 30px rgba(99,102,241,0.15), 0 8px 32px rgba(0,0,0,0.4)'
                 : '0 8px 32px rgba(0,0,0,0.25)',
             }}
@@ -131,23 +295,25 @@ export default function Search() {
               <SearchIcon
                 className={cn(
                   'w-5 h-5 flex-shrink-0 transition-colors',
-                  query ? 'text-accent-light' : 'text-slate-400'
+                  isListening ? 'text-red-400' : displayQuery ? 'text-accent-light' : 'text-slate-400'
                 )}
               />
               <input
                 ref={inputRef}
-                className="flex-1 bg-transparent text-lg text-white placeholder-slate-500 outline-none"
-                placeholder="z.B. M4x20 Schraube, Kondensator, Kabelkanal…"
-                value={query}
-                onChange={(e) => handleChange(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && doSearch(query)}
+                className="flex-1 bg-transparent text-lg placeholder-slate-500 outline-none transition-colors"
+                style={{ color: isListening && interimTranscript ? 'rgba(255,255,255,0.5)' : 'white' }}
+                placeholder={isListening ? 'Höre zu…' : 'z.B. M4x20 Schraube, Kondensator, Kabelkanal…'}
+                value={displayQuery}
+                onChange={(e) => !isListening && handleChange(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !isListening && doSearch(query)}
                 autoFocus
+                readOnly={isListening}
               />
               <div className="flex items-center gap-2">
                 {isSearching && (
                   <div className="w-5 h-5 border-2 border-accent-DEFAULT border-t-transparent rounded-full animate-spin" />
                 )}
-                {query && !isSearching && (
+                {displayQuery && !isSearching && !isListening && (
                   <button
                     onClick={handleClear}
                     className="w-6 h-6 flex items-center justify-center rounded-full text-slate-500 hover:text-slate-300 hover:bg-white/10 transition-all"
@@ -155,25 +321,57 @@ export default function Search() {
                     <X className="w-4 h-4" />
                   </button>
                 )}
-                <button
-                  className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-all"
-                  title="Sprachsuche (Voice Webhook)"
-                >
-                  <Mic className="w-4 h-4" />
-                </button>
+                {speechSupported && (
+                  <motion.button
+                    onClick={handleMicClick}
+                    className={cn(
+                      'w-8 h-8 flex items-center justify-center rounded-xl transition-all',
+                      isListening
+                        ? 'text-red-400 bg-red-500/15'
+                        : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                    )}
+                    title={isListening ? 'Aufnahme stoppen' : 'Sprachsuche starten'}
+                    animate={isListening ? { scale: [1, 1.15, 1] } : { scale: 1 }}
+                    transition={isListening ? { repeat: Infinity, duration: 1.2, ease: 'easeInOut' } : {}}
+                  >
+                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </motion.button>
+                )}
               </div>
             </div>
 
-            {/* Progress bar */}
+            {/* Progress bar — search or listening indicator */}
             {isSearching && (
               <div className="h-0.5 bg-gradient-to-r from-accent-DEFAULT via-led-cyan to-accent-DEFAULT animate-pulse" />
             )}
+            {isListening && !isSearching && (
+              <motion.div
+                className="h-0.5 bg-gradient-to-r from-red-500 via-red-400 to-red-500"
+                animate={{ opacity: [1, 0.4, 1] }}
+                transition={{ repeat: Infinity, duration: 1.0 }}
+              />
+            )}
           </div>
+
+          {/* Listening hint below input */}
+          <AnimatePresence>
+            {isListening && (
+              <motion.p
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                className="text-xs text-red-400 mt-2 ml-1 flex items-center gap-1.5"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping inline-block" />
+                Sprich jetzt — Erkennung läuft…
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Results */}
         <AnimatePresence mode="wait">
-          {!searched && !query && (
+          {!searched && !query && !isListening && (
             <motion.div
               key="hints"
               initial={{ opacity: 0, y: 8 }}
@@ -192,6 +390,11 @@ export default function Search() {
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                   Einfach eintippen — bei einem Treffer leuchtet das LED-Fach auf
                 </p>
+                {speechSupported && (
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                    Oder tippe auf das Mikrofon für Sprachsuche
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap justify-center gap-2 mt-2">
                 {['Schraube', 'Kondensator', 'LED', 'Widerstand', 'Kabel'].map((hint) => (
@@ -354,12 +557,17 @@ export default function Search() {
         >
           <div className="flex items-center gap-2 mb-1">
             <Mic className="w-3.5 h-3.5 text-accent-DEFAULT" />
-            <p className="text-xs font-semibold text-accent-light">Sprachsteuerung / Alexa</p>
+            <p className="text-xs font-semibold text-accent-light">Sprachsteuerung / Alexa / Home Assistant</p>
           </div>
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
             Webhook: <code className="text-accent-light font-mono">POST /api/voice/search</code> mit{' '}
             <code className="text-slate-300 font-mono">{'{"query": "M4x20 Schraube"}'}</code>
           </p>
+          {!speechSupported && (
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              Direkte Mikrofon-Suche benötigt Chrome, Edge oder Safari (Firefox: nicht unterstützt).
+            </p>
+          )}
         </div>
       </div>
     </div>
