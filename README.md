@@ -22,6 +22,9 @@
   <strong>Magazine Dashboard</strong><br>
   <img src="docs/dashboard.png" alt="Pick·n·Light Dashboard" width="85%">
   <br/><br/>
+  <strong>Magazin-Ansicht (Grid)</strong><br>
+  <img src="docs/magazine.png" alt="Pick·n·Light Magazin-Grid" width="85%">
+  <br/><br/>
   <img src="docs/search.png" alt="Pick·n·Light Teilsuche" width="85%">
   <br/><br/>
   <img src="docs/settings.png" alt="Pick·n·Light Einstellungen" width="85%">
