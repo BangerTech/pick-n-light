@@ -110,7 +110,7 @@ export default function Search() {
           >
             Teilsuche
           </h1>
-          <p className="text-slate-500 text-sm">
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
             Gib einen Suchbegriff ein — das LED-Fach leuchtet sofort auf
           </p>
         </div>
@@ -120,23 +120,23 @@ export default function Search() {
           <div
             className="relative rounded-2xl overflow-hidden transition-all duration-300"
             style={{
-              background: 'rgba(13,17,23,0.95)',
-              border: `1px solid ${query ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.2)'}`,
+              background: 'rgba(16,21,36,0.97)',
+              border: `1px solid ${query ? 'rgba(99,102,241,0.55)' : 'rgba(255,255,255,0.1)'}`,
               boxShadow: query
                 ? '0 0 30px rgba(99,102,241,0.15), 0 8px 32px rgba(0,0,0,0.4)'
-                : '0 8px 32px rgba(0,0,0,0.3)',
+                : '0 8px 32px rgba(0,0,0,0.25)',
             }}
           >
             <div className="flex items-center px-5 py-4 gap-4">
               <SearchIcon
                 className={cn(
                   'w-5 h-5 flex-shrink-0 transition-colors',
-                  query ? 'text-accent-light' : 'text-slate-600'
+                  query ? 'text-accent-light' : 'text-slate-400'
                 )}
               />
               <input
                 ref={inputRef}
-                className="flex-1 bg-transparent text-lg text-white placeholder-slate-600 outline-none"
+                className="flex-1 bg-transparent text-lg text-white placeholder-slate-500 outline-none"
                 placeholder="z.B. M4x20 Schraube, Kondensator, Kabelkanal…"
                 value={query}
                 onChange={(e) => handleChange(e.target.value)}
@@ -188,8 +188,8 @@ export default function Search() {
                 <Zap className="w-8 h-8 text-accent-DEFAULT" />
               </div>
               <div>
-                <p className="text-slate-400 font-medium mb-1">Suche nach Teilen</p>
-                <p className="text-slate-600 text-sm">
+                <p className="text-slate-300 font-medium mb-1">Suche nach Teilen</p>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                   Einfach eintippen — bei einem Treffer leuchtet das LED-Fach auf
                 </p>
               </div>
@@ -201,8 +201,8 @@ export default function Search() {
                       setQuery(hint);
                       doSearch(hint);
                     }}
-                    className="px-3 py-1.5 rounded-full text-xs text-slate-500 hover:text-slate-300 transition-all"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    className="px-3 py-1.5 rounded-full text-xs text-slate-400 hover:text-slate-200 transition-all"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}
                   >
                     {hint}
                   </button>
@@ -226,8 +226,8 @@ export default function Search() {
                 <X className="w-7 h-7 text-red-400" />
               </div>
               <div>
-                <p className="text-slate-300 font-medium">Nichts gefunden</p>
-                <p className="text-slate-600 text-sm mt-1">
+                <p className="text-slate-200 font-medium">Nichts gefunden</p>
+                <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
                   Kein Teil für <strong className="text-slate-400">"{query}"</strong> gefunden.
                   <br />
                   Alle LEDs haben kurz rot geblinkt.
@@ -258,8 +258,8 @@ export default function Search() {
                     onClick={() => handleResultClick(result)}
                     className="w-full text-left rounded-xl p-4 transition-all duration-200"
                     style={{
-                      background: isActive ? hBg : 'rgba(13,17,23,0.8)',
-                      border: `1px solid ${isActive ? hBorder : 'rgba(71,85,105,0.3)'}`,
+                      background: isActive ? hBg : 'rgba(22,28,44,0.95)',
+                      border: `1px solid ${isActive ? hBorder : 'rgba(255,255,255,0.09)'}`,
                       boxShadow: isActive ? hGlow : undefined,
                     }}
                   >
@@ -293,10 +293,10 @@ export default function Search() {
                           )}
                         </div>
                         {result.description && (
-                          <p className="text-xs text-slate-500 truncate">{result.description}</p>
+                          <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{result.description}</p>
                         )}
                         <div className="flex items-center gap-3 mt-1.5">
-                          <span className="flex items-center gap-1 text-xs text-slate-500">
+                          <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
                             <MapPin className="w-3 h-3" />
                             {result.slot.magazine.name} · Reihe {result.slot.row + 1}
                             {!result.slot.isLarge && `, Spalte ${result.slot.col + 1}`}
@@ -332,9 +332,9 @@ export default function Search() {
                       <div
                         className="flex-shrink-0 text-xs font-mono px-2 py-1 rounded-lg"
                         style={{
-                          background: 'rgba(255,255,255,0.04)',
-                          color: '#475569',
-                          border: '1px solid rgba(255,255,255,0.06)',
+                          background: 'rgba(255,255,255,0.05)',
+                          color: 'var(--text-muted)',
+                          border: '1px solid rgba(255,255,255,0.09)',
                         }}
                       >
                         LED {result.slot.ledStart}–{result.slot.ledStart + result.slot.ledCount - 1}
@@ -350,15 +350,15 @@ export default function Search() {
         {/* Voice webhook hint */}
         <div
           className="mt-8 rounded-xl p-4"
-          style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.1)' }}
+          style={{ background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)' }}
         >
           <div className="flex items-center gap-2 mb-1">
             <Mic className="w-3.5 h-3.5 text-accent-DEFAULT" />
             <p className="text-xs font-semibold text-accent-light">Sprachsteuerung / Alexa</p>
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
             Webhook: <code className="text-accent-light font-mono">POST /api/voice/search</code> mit{' '}
-            <code className="text-slate-400 font-mono">{'{"query": "M4x20 Schraube"}'}</code>
+            <code className="text-slate-300 font-mono">{'{"query": "M4x20 Schraube"}'}</code>
           </p>
         </div>
       </div>

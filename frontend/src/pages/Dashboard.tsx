@@ -133,7 +133,7 @@ export default function Dashboard() {
       {/* ── Top bar ── */}
       <div
         className="flex items-center gap-2 px-3 sm:px-5 py-2.5 flex-shrink-0"
-        style={{ borderBottom: '1px solid rgba(99,102,241,0.1)' }}
+        style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-1)' }}
       >
         {/* Tab row (single view) */}
         {!wallView && (
@@ -155,7 +155,7 @@ export default function Dashboard() {
                   <span
                     className={cn(
                       'text-xs px-1 py-0 rounded font-mono hidden sm:inline',
-                      activeMag?.id === mag.id ? 'text-accent-light/70' : 'text-slate-600'
+                      activeMag?.id === mag.id ? 'text-accent-light/70' : 'text-slate-500'
                     )}
                   >
                     {(mag as Magazine & { occupiedSlots?: number }).occupiedSlots}/{mag._count?.slots}
@@ -165,7 +165,7 @@ export default function Dashboard() {
             ))}
             <button
               onClick={() => navigate('/onboarding')}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-slate-600 hover:text-slate-400 border border-dashed border-slate-700 hover:border-slate-500 transition-all whitespace-nowrap"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 border border-dashed border-white/10 hover:border-white/20 transition-all whitespace-nowrap"
             >
               <Plus className="w-3 h-3" />
               <span className="hidden sm:inline">Neu</span>
@@ -176,11 +176,11 @@ export default function Dashboard() {
         {/* Wall view label */}
         {wallView && (
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-sm font-semibold text-slate-300">Wandansicht</span>
-            <span className="text-xs text-slate-600 font-mono">{magazines.length} Magazine</span>
+            <span className="text-sm font-semibold text-slate-200">Wandansicht</span>
+            <span className="text-xs text-slate-500 font-mono">{magazines.length} Magazine</span>
             <button
               onClick={() => navigate('/onboarding')}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-slate-600 hover:text-slate-400 border border-dashed border-slate-700 hover:border-slate-500 transition-all whitespace-nowrap ml-2"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-300 border border-dashed border-white/10 hover:border-white/20 transition-all whitespace-nowrap ml-2"
             >
               <Plus className="w-3 h-3" />
               <span className="hidden sm:inline">Neu</span>
@@ -285,7 +285,7 @@ export default function Dashboard() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               className="rounded-2xl p-6 w-full max-w-sm"
-              style={{ background: '#0d1117', border: '1px solid rgba(99,102,241,0.2)' }}
+              style={{ background: 'var(--bg-3)', border: '1px solid var(--border-accent)' }}
             >
               <h3 className="text-white font-semibold mb-4">Magazin umbenennen</h3>
               <input
@@ -329,9 +329,9 @@ export default function Dashboard() {
                     key={stat.label}
                     className="flex items-center gap-2 sm:gap-3 rounded-xl px-3 py-3"
                     style={{
-                      background: 'linear-gradient(155deg, rgba(18,26,44,0.95) 0%, rgba(9,13,22,0.95) 100%)',
-                      border: '1px solid rgba(99,102,241,0.14)',
-                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 16px rgba(0,0,0,0.4)',
+                      background: 'linear-gradient(155deg, rgba(22,32,54,0.97) 0%, rgba(12,16,30,0.97) 100%)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07), 0 4px 16px rgba(0,0,0,0.35)',
                     }}
                   >
                     <div
@@ -348,7 +348,7 @@ export default function Dashboard() {
                       <p className="text-sm sm:text-base font-bold font-mono leading-tight" style={{ color: stat.color, textShadow: `0 0 12px ${stat.glow}` }}>
                         {stat.value}
                       </p>
-                      <p className="text-[10px] sm:text-xs text-slate-600 truncate font-medium tracking-wide uppercase">{stat.label}</p>
+                      <p className="text-[10px] sm:text-xs truncate font-medium tracking-wide uppercase" style={{ color: 'var(--text-secondary)' }}>{stat.label}</p>
                     </div>
                   </div>
                 ))}
@@ -364,16 +364,16 @@ export default function Dashboard() {
               ) : null}
 
               {/* Legend */}
-              <div className="flex flex-wrap items-center gap-3 sm:gap-5 mt-4 text-xs text-slate-600">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-5 mt-4 text-xs" style={{ color: 'var(--text-muted)' }}>
                 {[
                   {
-                    color: 'rgba(99,102,241,0.2)',
-                    border: '1px dashed rgba(99,102,241,0.3)',
+                    color: 'rgba(99,102,241,0.12)',
+                    border: '1.5px dashed rgba(99,102,241,0.35)',
                     label: 'Leer',
                   },
                   {
-                    color: 'rgba(18,24,44,0.97)',
-                    border: '1px solid rgba(99,102,241,0.22)',
+                    color: 'rgba(22,32,56,0.98)',
+                    border: '1px solid rgba(255,255,255,0.1)',
                     label: 'Belegt',
                   },
                   {

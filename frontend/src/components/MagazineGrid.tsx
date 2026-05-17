@@ -82,15 +82,15 @@ const notFoundTheme: ColorTheme = {
 };
 
 const occupiedTheme: ColorTheme = {
-  outer: 'rgba(99,102,241,0.2)',
-  handleBg: 'linear-gradient(180deg,rgba(30,38,65,0.97) 0%,rgba(18,24,44,0.98) 100%)',
-  handleBorder: 'rgba(99,102,241,0.25)',
-  bodyBg: 'linear-gradient(180deg,rgba(12,16,30,0.97) 0%,rgba(7,10,18,0.98) 100%)',
-  nameTxt: '#e2e8f0',
-  qtyTxt: 'rgba(148,163,184,0.7)',
-  glowPulse: ['0 4px 20px rgba(0,0,0,0.65)', '0 4px 20px rgba(0,0,0,0.65)', '0 4px 20px rgba(0,0,0,0.65)'],
-  shimmer: 'rgba(255,255,255,0.04)',
-  barColor: 'rgba(99,102,241,0.4)',
+  outer: 'rgba(99,102,241,0.35)',
+  handleBg: 'linear-gradient(180deg,rgba(32,44,80,0.98) 0%,rgba(20,28,56,0.98) 100%)',
+  handleBorder: 'rgba(99,102,241,0.3)',
+  bodyBg: 'linear-gradient(180deg,rgba(14,19,36,0.98) 0%,rgba(9,12,22,0.98) 100%)',
+  nameTxt: '#e6edf3',
+  qtyTxt: 'rgba(203,213,225,0.85)',
+  glowPulse: ['0 4px 16px rgba(0,0,0,0.6)', '0 4px 16px rgba(0,0,0,0.6)', '0 4px 16px rgba(0,0,0,0.6)'],
+  shimmer: 'rgba(255,255,255,0.06)',
+  barColor: 'rgba(99,102,241,0.55)',
 };
 
 // ─── Magazine grid ────────────────────────────────────────────────────────────
@@ -140,9 +140,9 @@ export default function MagazineGrid({ magazine, onRefresh, compact = false }: M
       <div
         className="p-2 sm:p-2.5 rounded-2xl"
         style={{
-          background: 'linear-gradient(160deg,#0a0e1a 0%,#070b14 100%)',
-          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.8),inset 0 -2px 4px rgba(255,255,255,0.03),0 8px 32px rgba(0,0,0,0.6)',
-          border: '1px solid rgba(255,255,255,0.06)',
+          background: 'linear-gradient(160deg,#0e1420 0%,#0a0f1a 100%)',
+          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.6),inset 0 -1px 2px rgba(255,255,255,0.04),0 8px 32px rgba(0,0,0,0.5)',
+          border: '1px solid rgba(255,255,255,0.09)',
         }}
       >
         <div className="flex flex-col gap-1.5">
@@ -229,7 +229,7 @@ function DrawerCell({ slot, isLarge, isHighlighted, notFoundBlink, compact = fal
       className={cn('relative rounded-lg overflow-hidden cursor-pointer group', height)}
       style={
         isEmpty
-          ? { background: 'rgba(255,255,255,0.02)', border: '1.5px dashed rgba(99,102,241,0.18)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)' }
+          ? { background: 'rgba(255,255,255,0.03)', border: '1.5px dashed rgba(99,102,241,0.28)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)' }
           : { border: `1px solid ${theme!.outer}`, boxShadow: theme!.glowPulse[0] }
       }
       whileHover={isEmpty ? { scale: 1.01, borderColor: 'rgba(99,102,241,0.45)' } : { y: -2, scale: 1.008 }}
@@ -242,7 +242,10 @@ function DrawerCell({ slot, isLarge, isHighlighted, notFoundBlink, compact = fal
       }
     >
       {isEmpty ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-slate-700 group-hover:text-slate-500 transition-colors">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 transition-colors" style={{ color: 'rgba(100,116,139,0.7)' }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'rgba(148,163,184,0.9)' )}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(100,116,139,0.7)')}
+        >
           <Plus className={compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} strokeWidth={1.5} />
           {!compact && <span className="text-[10px] font-medium tracking-widest uppercase">Leer</span>}
         </div>

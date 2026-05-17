@@ -185,20 +185,20 @@ export default function Settings() {
           >
             Einstellungen
           </h1>
-          <p className="text-slate-500 text-sm">WLED-Geräte, LED-Verhalten und Farben</p>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>WLED-Geräte, LED-Verhalten und Farben</p>
         </div>
 
         {/* MQTT Status */}
         <section
           className="rounded-2xl p-5"
-          style={{ background: 'rgba(13,17,23,0.8)', border: '1px solid rgba(99,102,241,0.15)' }}
+          style={{ background: 'var(--bg-2)', border: '1px solid var(--border-default)' }}
         >
           <div className="flex items-center gap-3">
             <div
               className={cn(
-                'w-3 h-3 rounded-full',
-                mqttStatus?.status === 'connected' ? 'bg-emerald-400' : 'bg-slate-600'
-              )}
+                  'w-3 h-3 rounded-full',
+                  mqttStatus?.status === 'connected' ? 'bg-emerald-400' : 'bg-slate-500'
+                )}
               style={
                 mqttStatus?.status === 'connected'
                   ? { boxShadow: '0 0 10px rgba(52,211,153,0.8)' }
@@ -210,13 +210,13 @@ export default function Settings() {
                 MQTT Broker{' '}
                 <span
                   className={cn(
-                    mqttStatus?.status === 'connected' ? 'text-emerald-400' : 'text-slate-500'
+                    mqttStatus?.status === 'connected' ? 'text-emerald-400' : 'text-slate-400'
                   )}
                 >
                   ({mqttStatus?.status === 'connected' ? 'Verbunden' : 'Getrennt'})
                 </span>
               </p>
-              <p className="text-xs text-slate-600">
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                 Mosquitto läuft intern auf Port 1883 (MQTT) und 9001 (WebSocket)
               </p>
             </div>
@@ -230,7 +230,7 @@ export default function Settings() {
               <h2 className="text-base font-semibold text-white flex items-center gap-2">
                 <Wifi className="w-4 h-4 text-accent-DEFAULT" /> WLED Geräte
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">ESP32/ESP8266 mit WLED-Firmware</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>ESP32/ESP8266 mit WLED-Firmware</p>
             </div>
             <button
               onClick={() => {
@@ -251,11 +251,11 @@ export default function Settings() {
           ) : devices.length === 0 ? (
             <div
               className="rounded-2xl p-8 text-center"
-              style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(99,102,241,0.15)' }}
+              style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)' }}
             >
-              <Wifi className="w-8 h-8 text-slate-700 mx-auto mb-2" />
-              <p className="text-slate-500 text-sm">Noch keine WLED-Geräte konfiguriert.</p>
-              <p className="text-slate-600 text-xs mt-1">
+              <Wifi className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Noch keine WLED-Geräte konfiguriert.</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
                 Füge ein Gerät hinzu, um LEDs zu steuern.
               </p>
             </div>
@@ -267,8 +267,8 @@ export default function Settings() {
                   layout
                   className="rounded-2xl overflow-hidden"
                   style={{
-                    background: 'rgba(13,17,23,0.8)',
-                    border: `1px solid ${testResult[device.id]?.ok === false ? 'rgba(239,68,68,0.3)' : testResult[device.id]?.ok === true ? 'rgba(16,185,129,0.3)' : 'rgba(99,102,241,0.15)'}`,
+                    background: 'var(--bg-2)',
+                    border: `1px solid ${testResult[device.id]?.ok === false ? 'rgba(239,68,68,0.35)' : testResult[device.id]?.ok === true ? 'rgba(16,185,129,0.35)' : 'var(--border-default)'}`,
                     transition: 'border-color 0.3s',
                   }}
                 >
@@ -290,15 +290,15 @@ export default function Settings() {
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-slate-200">{device.name}</p>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
                             Topic: <code className="text-accent-light">{device.mqttTopic}/api</code>
                             {device.ipAddress && (
-                              <> · <code className="text-slate-400">{device.ipAddress}</code></>
+                              <> · <code className="text-slate-300">{device.ipAddress}</code></>
                             )}
                             {' · '}{device.ledCount} LEDs
                           </p>
                           {device.magazine && (
-                            <p className="text-xs text-slate-600 mt-0.5">📦 {device.magazine.name}</p>
+                            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>📦 {device.magazine.name}</p>
                           )}
                         </div>
                       </div>
@@ -381,23 +381,23 @@ export default function Settings() {
                       >
                         <div
                           className="px-4 pb-4"
-                          style={{ borderTop: '1px solid rgba(99,102,241,0.1)' }}
+                          style={{ borderTop: '1px solid var(--border-subtle)' }}
                         >
                           <p className="text-xs font-semibold text-led-cyan flex items-center gap-1.5 pt-3 mb-2">
                             <Wifi className="w-3.5 h-3.5" /> WLED Einrichtung
                           </p>
                           <div
                             className="rounded-xl p-3 font-mono text-xs leading-relaxed"
-                            style={{ background: 'rgba(7,9,15,0.8)', border: '1px solid rgba(6,182,212,0.15)' }}
+                            style={{ background: 'rgba(9,12,22,0.9)', border: '1px solid rgba(6,182,212,0.2)' }}
                           >
-                            <p className="text-slate-500 mb-1">In WLED: Config → MQTT</p>
-                            <p><span className="text-slate-500">Broker IP: </span><span className="text-accent-light">{window.location.hostname}:1883</span></p>
-                            <p><span className="text-slate-500">Topic:     </span><span className="text-accent-light">{device.mqttTopic}</span></p>
-                            <p className="text-slate-600 mt-1.5 text-xs">
-                              → WLED hört dann auf: <span className="text-slate-400">{device.mqttTopic}/api</span>
+                            <p className="mb-1" style={{ color: 'var(--text-secondary)' }}>In WLED: Config → MQTT</p>
+                            <p><span style={{ color: 'var(--text-secondary)' }}>Broker IP: </span><span className="text-accent-light">{window.location.hostname}:1883</span></p>
+                            <p><span style={{ color: 'var(--text-secondary)' }}>Topic:     </span><span className="text-accent-light">{device.mqttTopic}</span></p>
+                            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                              → WLED hört dann auf: <span className="text-slate-300">{device.mqttTopic}/api</span>
                             </p>
                           </div>
-                          <p className="text-xs text-slate-600 mt-2">
+                          <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
                             Nach dem Speichern in WLED den Test-Button drücken — alle {device.ledCount} LEDs sollten kurz aufleuchten.
                           </p>
                         </div>
@@ -425,7 +425,7 @@ export default function Settings() {
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
                 className="w-full max-w-md rounded-2xl p-6"
-                style={{ background: '#0d1117', border: '1px solid rgba(99,102,241,0.25)' }}
+                style={{ background: 'var(--bg-3)', border: '1px solid var(--border-accent)' }}
               >
                 <h3 className="text-white font-semibold mb-5">
                   {editingDevice ? 'Gerät bearbeiten' : 'Neues WLED-Gerät'}
@@ -441,9 +441,9 @@ export default function Settings() {
                         value={deviceForm.magazineId}
                         onChange={(e) => setDeviceForm({ ...deviceForm, magazineId: e.target.value })}
                       >
-                        <option value="" style={{ background: '#0d1117' }}>Magazin wählen…</option>
+                        <option value="" style={{ background: 'var(--bg-3)' }}>Magazin wählen…</option>
                         {magazines.map((m) => (
-                          <option key={m.id} value={m.id} style={{ background: '#0d1117' }}>
+                          <option key={m.id} value={m.id} style={{ background: 'var(--bg-3)' }}>
                             {m.name}
                           </option>
                         ))}
@@ -500,15 +500,15 @@ export default function Settings() {
         {/* LED Settings */}
         <section
           className="rounded-2xl p-5 flex flex-col gap-5"
-          style={{ background: 'rgba(13,17,23,0.8)', border: '1px solid rgba(99,102,241,0.15)' }}
+          style={{ background: 'var(--bg-2)', border: '1px solid var(--border-default)' }}
         >
           <h2 className="text-base font-semibold text-white flex items-center gap-2">
             <Zap className="w-4 h-4 text-led-on" /> LED-Verhalten
           </h2>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-              <Clock className="w-4 h-4 text-slate-500" />
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-200 mb-2">
+              <Clock className="w-4 h-4 text-slate-400" />
               Auto-Ausschalten nach{' '}
               <span className="text-accent-light font-bold font-mono">{autoOff}s</span>
             </label>
@@ -518,14 +518,14 @@ export default function Settings() {
               onChange={(e) => setAutoOff(e.target.value)}
               className="w-full accent-indigo-500"
             />
-            <div className="flex justify-between text-xs text-slate-600 mt-1">
+            <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
               <span>5s</span><span>5 min</span>
             </div>
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2 mb-3">
-              <Palette className="w-4 h-4 text-slate-500" /> LED-Farben (RGB)
+            <h3 className="text-sm font-medium text-slate-200 flex items-center gap-2 mb-3">
+              <Palette className="w-4 h-4 text-slate-400" /> LED-Farben (RGB)
             </h3>
             <div className="grid grid-cols-1 gap-3">
               {[
@@ -542,10 +542,10 @@ export default function Settings() {
                     style={{ background: 'rgba(255,255,255,0.05)' }}
                   />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-300">{colorField.label}</p>
-                    <p className="text-xs text-slate-600">{colorField.desc}</p>
+                    <p className="text-sm font-medium text-slate-200">{colorField.label}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{colorField.desc}</p>
                   </div>
-                  <code className="text-xs font-mono text-slate-500 bg-black/30 px-2 py-1 rounded">
+                  <code className="text-xs font-mono bg-black/30 px-2 py-1 rounded" style={{ color: 'var(--text-secondary)' }}>
                     {colorField.value}
                   </code>
                 </div>
@@ -577,25 +577,25 @@ export default function Settings() {
         {/* Voice Webhook */}
         <section
           className="rounded-2xl p-5"
-          style={{ background: 'rgba(13,17,23,0.8)', border: '1px solid rgba(99,102,241,0.15)' }}
+          style={{ background: 'var(--bg-2)', border: '1px solid var(--border-default)' }}
         >
           <h2 className="text-base font-semibold text-white mb-3">🎙️ Sprachsteuerung</h2>
-          <div className="flex flex-col gap-3 text-sm text-slate-400">
+          <div className="flex flex-col gap-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
             <p>Nutze den Voice-Webhook für Alexa, Home Assistant, IFTTT oder n8n:</p>
             <div
               className="rounded-xl p-3 font-mono text-xs"
-              style={{ background: 'rgba(7,9,15,0.8)', border: '1px solid rgba(99,102,241,0.1)' }}
+              style={{ background: 'rgba(9,12,22,0.9)', border: '1px solid rgba(99,102,241,0.2)' }}
             >
-              <p className="text-slate-500 mb-1"># Suche auslösen</p>
+              <p className="mb-1" style={{ color: 'var(--text-muted)' }}># Suche auslösen</p>
               <p className="text-emerald-400">POST /api/voice/search</p>
-              <p className="text-slate-400">{'{"query": "M4x20 Schraube"}'}</p>
+              <p className="text-slate-300">{'{"query": "M4x20 Schraube"}'}</p>
             </div>
             <div
               className="rounded-xl p-3"
-              style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)' }}
+              style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}
             >
-              <p className="text-slate-300 font-medium mb-1">Home Assistant Beispiel</p>
-              <pre className="text-xs text-slate-500 whitespace-pre-wrap font-mono">{`rest_command:
+              <p className="text-slate-200 font-medium mb-1">Home Assistant Beispiel</p>
+              <pre className="text-xs whitespace-pre-wrap font-mono" style={{ color: 'var(--text-secondary)' }}>{`rest_command:
   picknlight:
     url: "http://<SERVER_IP>:7050/api/voice/search"
     method: POST

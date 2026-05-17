@@ -41,18 +41,18 @@ export default function WallMagazineCard({ mag, index, compact }: WallMagazineCa
       transition={{ delay: index * 0.04 }}
       className="flex flex-col rounded-xl overflow-hidden"
       style={{
-        background: 'rgba(255,255,255,0.02)',
-        border: '1px solid rgba(99,102,241,0.12)',
+        background: 'var(--bg-2)',
+        border: '1px solid var(--border-default)',
       }}
     >
       {/* Magazine header */}
       <div
         className="flex items-center justify-between px-3 py-2 flex-shrink-0"
-        style={{ borderBottom: '1px solid rgba(99,102,241,0.08)' }}
+        style={{ borderBottom: '1px solid var(--border-subtle)' }}
       >
         <div className="flex items-center gap-2 min-w-0">
           <LayoutGrid className="w-3.5 h-3.5 text-accent-light flex-shrink-0" />
-          <span className="text-xs sm:text-sm font-semibold text-slate-200 truncate">{mag.name}</span>
+          <span className="text-xs sm:text-sm font-semibold text-slate-100 truncate">{mag.name}</span>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 ml-2">
           {lowStock > 0 && (
@@ -61,15 +61,15 @@ export default function WallMagazineCard({ mag, index, compact }: WallMagazineCa
               style={{
                 background: 'rgba(249,115,22,0.15)',
                 color: '#f97316',
-                border: '1px solid rgba(249,115,22,0.2)',
+                border: '1px solid rgba(249,115,22,0.25)',
               }}
             >
               ⚠ {lowStock}
             </span>
           )}
           <span
-            className="text-xs font-mono text-slate-500"
-            style={{ fontVariantNumeric: 'tabular-nums' }}
+            className="text-xs font-mono"
+            style={{ color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}
           >
             {occupied}/{total}
           </span>

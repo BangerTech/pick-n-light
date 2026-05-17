@@ -298,3 +298,4 @@ buildHighlightTheme("0,255,0")
 - **2026-05-17** – Logo eingebunden: Favicon, Apple Touch Icon, Sidebar (ersetzt Zap-Icon), README-Header
 - **2026-05-17** – Bugfix: Highlight-Farbe jetzt dynamisch aus `search_highlight_color` Setting (nicht mehr hardcoded amber)
 - **2026-05-17** – Bugfix: `highlightedSlotId` wird beim Verlassen der Suchseite automatisch bereinigt (kein manueller Reload nötig)
+- **2026-05-17** – Kontrastverbesserung: Dark-Theme komplett überarbeitet für WCAG-konforme Lesbarkeit (Hintergrundpalette, Textebenen, Borders, Oberflächenstruktur)

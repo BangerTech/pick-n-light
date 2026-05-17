@@ -23,12 +23,12 @@ export default function Sidebar() {
     <aside
       className="w-16 lg:w-56 flex flex-col h-screen flex-shrink-0"
       style={{
-        background: 'rgba(7, 9, 15, 0.95)',
-        borderRight: '1px solid rgba(99,102,241,0.12)',
+        background: 'var(--bg-1)',
+        borderRight: '1px solid var(--border-subtle)',
       }}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-3 py-4 border-b border-white/5">
+      <div className="flex items-center gap-3 px-3 py-4" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
         <img
           src="/logo.png"
           alt="Pick·n·Light"
@@ -37,7 +37,7 @@ export default function Sidebar() {
         />
         <div className="hidden lg:block overflow-hidden">
           <p className="text-sm font-bold text-white leading-tight tracking-wide">Pick·n·Light</p>
-          <p className="text-xs text-slate-500 leading-tight">LED Lager System</p>
+          <p className="text-xs leading-tight" style={{ color: 'var(--text-muted)' }}>LED Lager System</p>
         </div>
       </div>
 
@@ -80,7 +80,7 @@ export default function Sidebar() {
       {/* MQTT Status */}
       <div
         className="mx-2 mb-4 px-3 py-2.5 rounded-lg"
-        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)' }}
       >
         <div className="flex items-center gap-2">
           <div
@@ -91,13 +91,8 @@ export default function Sidebar() {
             style={isConnected ? { boxShadow: '0 0 6px rgba(52,211,153,0.8)' } : {}}
           />
           <div className="hidden lg:block overflow-hidden">
-            <p className="text-xs font-medium text-slate-300 leading-tight">MQTT Broker</p>
-            <p
-              className={cn(
-                'text-xs leading-tight',
-                isConnected ? 'text-emerald-400' : 'text-slate-500'
-              )}
-            >
+            <p className="text-xs font-medium leading-tight" style={{ color: 'var(--text-secondary)' }}>MQTT Broker</p>
+            <p className={cn('text-xs font-medium leading-tight', isConnected ? 'text-emerald-400' : 'text-slate-400')}>
               {isConnected ? 'Verbunden' : 'Getrennt'}
             </p>
           </div>
