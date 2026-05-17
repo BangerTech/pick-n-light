@@ -1,10 +1,17 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search as SearchIcon, X, Zap, Package, MapPin, AlertTriangle, Mic } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAppStore } from '@/store';
 import type { SearchResult } from '@/lib/types';
 import { cn, isLowStock, formatQuantity } from '@/lib/utils';
+
+function parseRgb(str: string | undefined): [number, number, number] {
+  if (!str) return [245, 158, 11];
+  const parts = str.split(',').map((s) => parseInt(s.trim(), 10));
+  return [parts[0] ?? 245, parts[1] ?? 158, parts[2] ?? 11];
+}
 
 export default function Search() {
   const [query, setQuery] = useState('');
@@ -15,6 +22,28 @@ export default function Search() {
   const { setHighlightedSlotId, triggerNotFoundBlink } = useAppStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: api.settings.get,
+    staleTime: 60_000,
+  });
+
+  const [hr, hg, hb] = parseRgb(settings?.search_highlight_color);
+  const hColor = `rgb(${hr},${hg},${hb})`;
+  const hBg = `rgba(${hr},${hg},${hb},0.1)`;
+  const hBorder = `rgba(${hr},${hg},${hb},0.5)`;
+  const hGlow = `0 0 20px rgba(${hr},${hg},${hb},0.12)`;
+  const hIconBg = `rgba(${hr},${hg},${hb},0.2)`;
+  const hIconBorder = `rgba(${hr},${hg},${hb},0.3)`;
+
+  // Clear highlight when leaving the Search page
+  useEffect(() => {
+    return () => {
+      setHighlightedSlotId(null);
+      api.search.clearHighlight().catch(() => {});
+    };
+  }, [setHighlightedSlotId]);
 
   const doSearch = useCallback(
     async (q: string) => {
@@ -227,34 +256,23 @@ export default function Search() {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     onClick={() => handleResultClick(result)}
-                    className={cn(
-                      'w-full text-left rounded-xl p-4 transition-all duration-200',
-                      isActive
-                        ? 'border-led-on'
-                        : 'border-slate-700/50 hover:border-accent-DEFAULT/40'
-                    )}
+                    className="w-full text-left rounded-xl p-4 transition-all duration-200"
                     style={{
-                      background: isActive
-                        ? 'rgba(245,158,11,0.08)'
-                        : 'rgba(13,17,23,0.8)',
-                      border: `1px solid ${isActive ? 'rgba(245,158,11,0.5)' : 'rgba(71,85,105,0.3)'}`,
-                      boxShadow: isActive
-                        ? '0 0 20px rgba(245,158,11,0.1)'
-                        : undefined,
+                      background: isActive ? hBg : 'rgba(13,17,23,0.8)',
+                      border: `1px solid ${isActive ? hBorder : 'rgba(71,85,105,0.3)'}`,
+                      boxShadow: isActive ? hGlow : undefined,
                     }}
                   >
                     <div className="flex items-start gap-3">
                       <div
                         className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
                         style={{
-                          background: isActive
-                            ? 'rgba(245,158,11,0.2)'
-                            : 'rgba(99,102,241,0.1)',
-                          border: `1px solid ${isActive ? 'rgba(245,158,11,0.3)' : 'rgba(99,102,241,0.15)'}`,
+                          background: isActive ? hIconBg : 'rgba(99,102,241,0.1)',
+                          border: `1px solid ${isActive ? hIconBorder : 'rgba(99,102,241,0.15)'}`,
                         }}
                       >
                         {isActive ? (
-                          <Zap className="w-4 h-4 text-led-on" fill="currentColor" />
+                          <Zap className="w-4 h-4" style={{ color: hColor }} fill="currentColor" />
                         ) : (
                           <Package className="w-4 h-4 text-accent-DEFAULT" />
                         )}
@@ -263,10 +281,8 @@ export default function Search() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
                           <p
-                            className={cn(
-                              'font-semibold text-sm',
-                              isActive ? 'text-led-on' : 'text-slate-200'
-                            )}
+                            className="font-semibold text-sm"
+                            style={{ color: isActive ? hColor : '#e2e8f0' }}
                           >
                             {result.name}
                           </p>

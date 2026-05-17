@@ -25,6 +25,12 @@ import WallMagazineCard from '@/components/WallMagazineCard';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
+function parseRgb(str: string | undefined): [number, number, number] {
+  if (!str) return [245, 158, 11];
+  const parts = str.split(',').map((s) => parseInt(s.trim(), 10));
+  return [parts[0] ?? 245, parts[1] ?? 158, parts[2] ?? 11];
+}
+
 export default function Dashboard() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -35,6 +41,15 @@ export default function Dashboard() {
     queryKey: ['magazines'],
     queryFn: api.magazines.list,
   });
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: api.settings.get,
+    staleTime: 60_000,
+  });
+
+  const [hr, hg, hb] = parseRgb(settings?.search_highlight_color);
+  const [lr, lg, lb] = parseRgb(settings?.low_stock_color);
 
   const activeMag = magazines.find((m) => m.id === activeMagazineId) ?? magazines[0];
 
@@ -306,26 +321,34 @@ export default function Dashboard() {
               {/* Stats */}
               <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-5">
                 {[
-                  { icon: Package, label: 'Belegt', value: `${occupiedCount} / ${totalSlots}`, color: '#6366f1', glow: 'rgba(99,102,241,0.3)' },
-                  { icon: Zap, label: 'Frei', value: String(totalSlots - occupiedCount), color: '#10b981', glow: 'rgba(16,185,129,0.3)' },
-                  { icon: AlertTriangle, label: 'Niedrig', value: String(lowStockCount), color: lowStockCount > 0 ? '#f97316' : '#475569', glow: lowStockCount > 0 ? 'rgba(249,115,22,0.3)' : 'none' },
+                  { icon: Package, label: 'Belegt', value: `${occupiedCount} / ${totalSlots}`, color: '#818cf8', glow: 'rgba(99,102,241,0.35)' },
+                  { icon: Zap, label: 'Frei', value: String(totalSlots - occupiedCount), color: '#34d399', glow: 'rgba(52,211,153,0.35)' },
+                  { icon: AlertTriangle, label: 'Niedrig', value: String(lowStockCount), color: lowStockCount > 0 ? '#fb923c' : '#475569', glow: lowStockCount > 0 ? 'rgba(251,146,60,0.35)' : 'transparent' },
                 ].map((stat) => (
                   <div
                     key={stat.label}
-                    className="flex items-center gap-2 sm:gap-3 rounded-xl px-3 py-2.5"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                    className="flex items-center gap-2 sm:gap-3 rounded-xl px-3 py-3"
+                    style={{
+                      background: 'linear-gradient(155deg, rgba(18,26,44,0.95) 0%, rgba(9,13,22,0.95) 100%)',
+                      border: '1px solid rgba(99,102,241,0.14)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 4px 16px rgba(0,0,0,0.4)',
+                    }}
                   >
                     <div
-                      className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ background: `${stat.color}22`, boxShadow: `0 0 10px ${stat.glow}` }}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{
+                        background: `${stat.color}18`,
+                        boxShadow: `0 0 14px ${stat.glow}, inset 0 1px 0 rgba(255,255,255,0.08)`,
+                        border: `1px solid ${stat.color}30`,
+                      }}
                     >
                       <stat.icon className="w-3.5 h-3.5" style={{ color: stat.color }} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm sm:text-base font-bold font-mono leading-tight" style={{ color: stat.color }}>
+                      <p className="text-sm sm:text-base font-bold font-mono leading-tight" style={{ color: stat.color, textShadow: `0 0 12px ${stat.glow}` }}>
                         {stat.value}
                       </p>
-                      <p className="text-xs text-slate-500 truncate">{stat.label}</p>
+                      <p className="text-[10px] sm:text-xs text-slate-600 truncate font-medium tracking-wide uppercase">{stat.label}</p>
                     </div>
                   </div>
                 ))}
@@ -341,12 +364,28 @@ export default function Dashboard() {
               ) : null}
 
               {/* Legend */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-5 mt-4 text-xs text-slate-600">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-5 mt-4 text-xs text-slate-600">
                 {[
-                  { color: 'rgba(99,102,241,0.3)', border: '1px dashed rgba(99,102,241,0.3)', label: 'Leer (klicken zum Befüllen)' },
-                  { color: 'rgba(30,41,59,0.8)', border: '1px solid rgba(71,85,105,0.5)', label: 'Belegt' },
-                  { color: 'rgba(245,158,11,0.15)', border: '1px solid #f59e0b', label: 'Gefunden / Aktiv' },
-                  { color: 'transparent', border: '1.5px solid #f97316', label: 'Niedrigbestand' },
+                  {
+                    color: 'rgba(99,102,241,0.2)',
+                    border: '1px dashed rgba(99,102,241,0.3)',
+                    label: 'Leer',
+                  },
+                  {
+                    color: 'rgba(18,24,44,0.97)',
+                    border: '1px solid rgba(99,102,241,0.22)',
+                    label: 'Belegt',
+                  },
+                  {
+                    color: `rgba(${hr},${hg},${hb},0.15)`,
+                    border: `1.5px solid rgba(${hr},${hg},${hb},0.7)`,
+                    label: 'Fach ausgewählt',
+                  },
+                  {
+                    color: `rgba(${lr},${lg},${lb},0.12)`,
+                    border: `1.5px solid rgba(${lr},${lg},${lb},0.55)`,
+                    label: 'Niedrigbestand',
+                  },
                 ].map((l) => (
                   <div key={l.label} className="flex items-center gap-1.5">
                     <div className="w-4 h-3 rounded flex-shrink-0" style={{ background: l.color, border: l.border }} />

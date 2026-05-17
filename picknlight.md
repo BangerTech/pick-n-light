@@ -254,6 +254,37 @@ total      = 0 + 8×18 + 18 = 162
 | `005_skip_first_and_large_row` | `led_skip_first`, `large_row_leds` Spalten in magazines |
 | `006_add_row_padding` | `row_padding` Spalte in magazines |
 
+## Frontend-Architektur (Highlights)
+
+### Farbthema der Slot-Hervorhebung
+Die Highlight-Farbe des gefundenen Fachs (`DrawerCell` in `MagazineGrid.tsx`) wird **dynamisch** aus der Setting `search_highlight_color` geladen. Die gesamte Farbpalette (Handle-Gradient, Text, Glow-Animation, Akzentlinie) wird zur Laufzeit aus dem konfigurierten RGB-Wert berechnet:
+
+```
+buildHighlightTheme("0,255,0")
+→ outer, handleBg, bodyBg, nameTxt, qtyTxt, glowPulse, shimmer, barColor
+   alle abgeleitet von r=0 g=255 b=0
+```
+
+### Highlight-Lifecycle
+- Suche setzt `highlightedSlotId` im Zustand-Store (Zustand 5 + `persist` Middleware)
+- `MagazineGrid` liest den Store und übergibt `isHighlighted` an jede `DrawerCell`
+- Beim **Verlassen der Suchseite** räumt ein `useEffect`-Cleanup auf: Store → `null`, Backend → `DELETE /api/search/highlight`
+- Beim **Schließen des Slot-Modals** wird ebenfalls `clearHighlight()` aufgerufen
+
+### Wandansicht (Wall View)
+- `wallView` und `wallColumns` (1/2/3) werden via Zustand `persist` im LocalStorage gespeichert
+- Jedes Magazin-Tile ist ein eigenständiger `WallMagazineCard`-Komponent mit eigenem `useQuery(['magazine', id])`
+- `compact`-Prop aktiviert kleinere Zellhöhen + vereinfachte Darstellung ab 3 Spalten
+
+### Drawer-Design (MagazineGrid)
+- Jedes Fach ist ein zweizoniges "Schubladenfront"-Element:
+  - **Handle-Strip** (oben, ~32% Höhe): Glassmorphism-Gradient, Name, Glanz-Highlight
+  - **Drawer Body** (unten, ~68% Höhe): Dunkler Korpus, Menge in großer Mono-Schrift, Tag-Dots
+- Pulsierender `box-shadow` via Framer Motion `animate`-Array (kein CSS keyframe)
+- Kabinett-Rahmen-DIV mit inset-Shadow simuliert das physische schwarze Gehäuse
+
+---
+
 ## Changelog
 
 - **2026-05-17** – Initiales Setup, vollständige Implementierung
@@ -262,5 +293,8 @@ total      = 0 + 8×18 + 18 = 162
 - **2026-05-17** – Onboarding: totalLedsOverride für Live-Tests vor dem Speichern
 - **2026-05-17** – Globale Tags: `GET /api/tags` aggregiert alle eindeutigen Tags; Tag-Autocomplete im Teile-Formular
 - **2026-05-17** – Wandansicht (Wall View): Dashboard zeigt alle Magazine nebeneinander (1/2/3 Spalten, persistent im LocalStorage)
-- **2026-05-17** – Magazin-Grid: verbesserte SlotCell-Optik (Reihe·Spalte-Badge, Tag-Dots, Akzentlinie), `compact`-Modus für Wandansicht
+- **2026-05-17** – Magazin-Grid: DrawerCell-Design (Schubladenoptik, zweizonig, Glassmorphism, physischer Rahmen)
 - **2026-05-17** – Responsive Design: Bottom-Navigation auf Mobilgeräten (< sm), bottom-sheet-Modal, safe-area-Unterstützung
+- **2026-05-17** – Logo eingebunden: Favicon, Apple Touch Icon, Sidebar (ersetzt Zap-Icon), README-Header
+- **2026-05-17** – Bugfix: Highlight-Farbe jetzt dynamisch aus `search_highlight_color` Setting (nicht mehr hardcoded amber)
+- **2026-05-17** – Bugfix: `highlightedSlotId` wird beim Verlassen der Suchseite automatisch bereinigt (kein manueller Reload nötig)

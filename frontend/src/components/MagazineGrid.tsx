@@ -1,11 +1,99 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Package, AlertTriangle, Zap } from 'lucide-react';
+import { Plus, Zap } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import type { Slot, Magazine } from '@/lib/types';
 import { cn, isLowStock, formatQuantity } from '@/lib/utils';
 import { useAppStore } from '@/store';
 import { api } from '@/lib/api';
 import SlotModal from './SlotModal';
+
+// ─── Color helpers ────────────────────────────────────────────────────────────
+
+function parseRgb(str: string | undefined): [number, number, number] {
+  if (!str) return [245, 158, 11];
+  const parts = str.split(',').map((s) => parseInt(s.trim(), 10));
+  return [parts[0] ?? 245, parts[1] ?? 158, parts[2] ?? 11];
+}
+
+interface ColorTheme {
+  outer: string;
+  handleBg: string;
+  handleBorder: string;
+  bodyBg: string;
+  nameTxt: string;
+  qtyTxt: string;
+  glowPulse: [string, string, string];
+  shimmer: string;
+  barColor: string;
+}
+
+function buildHighlightTheme(rgbStr: string | undefined): ColorTheme {
+  const [r, g, b] = parseRgb(rgbStr);
+  const dk = (x: number, f: number) => Math.round(x * f);
+  const lk = (x: number) => Math.min(255, Math.round(x * 0.75 + 255 * 0.25));
+  return {
+    outer: `rgba(${r},${g},${b},0.75)`,
+    handleBg: `linear-gradient(180deg,rgba(${dk(r,0.45)},${dk(g,0.28)},${dk(b,0.28)},0.95) 0%,rgba(${dk(r,0.28)},${dk(g,0.17)},${dk(b,0.17)},0.98) 100%)`,
+    handleBorder: `rgba(${r},${g},${b},0.5)`,
+    bodyBg: `linear-gradient(180deg,rgba(${dk(r,0.18)},${dk(g,0.11)},${dk(b,0.11)},0.97) 0%,rgba(${dk(r,0.1)},${dk(g,0.06)},${dk(b,0.06)},0.98) 100%)`,
+    nameTxt: `rgb(${lk(r)},${lk(g)},${lk(b)})`,
+    qtyTxt: `rgba(${r},${g},${b},0.9)`,
+    glowPulse: [
+      `0 0 18px rgba(${r},${g},${b},0.45),0 4px 20px rgba(0,0,0,0.7)`,
+      `0 0 42px rgba(${r},${g},${b},0.85),0 4px 20px rgba(0,0,0,0.7)`,
+      `0 0 18px rgba(${r},${g},${b},0.45),0 4px 20px rgba(0,0,0,0.7)`,
+    ],
+    shimmer: `rgba(${r},${g},${b},0.22)`,
+    barColor: `rgba(${r},${g},${b},0.9)`,
+  };
+}
+
+const lowStockTheme: ColorTheme = {
+  outer: 'rgba(249,115,22,0.55)',
+  handleBg: 'linear-gradient(180deg,rgba(80,38,8,0.95) 0%,rgba(50,22,4,0.98) 100%)',
+  handleBorder: 'rgba(249,115,22,0.4)',
+  bodyBg: 'linear-gradient(180deg,rgba(30,14,2,0.97) 0%,rgba(16,8,1,0.98) 100%)',
+  nameTxt: '#fdba74',
+  qtyTxt: 'rgba(253,186,116,0.8)',
+  glowPulse: [
+    '0 0 14px rgba(249,115,22,0.3),0 4px 20px rgba(0,0,0,0.7)',
+    '0 0 26px rgba(249,115,22,0.55),0 4px 20px rgba(0,0,0,0.7)',
+    '0 0 14px rgba(249,115,22,0.3),0 4px 20px rgba(0,0,0,0.7)',
+  ],
+  shimmer: 'rgba(249,115,22,0.15)',
+  barColor: 'rgba(249,115,22,0.9)',
+};
+
+const notFoundTheme: ColorTheme = {
+  outer: 'rgba(239,68,68,0.7)',
+  handleBg: 'linear-gradient(180deg,rgba(80,10,10,0.95) 0%,rgba(50,6,6,0.98) 100%)',
+  handleBorder: 'rgba(239,68,68,0.5)',
+  bodyBg: 'linear-gradient(180deg,rgba(30,4,4,0.97) 0%,rgba(16,2,2,0.98) 100%)',
+  nameTxt: '#fca5a5',
+  qtyTxt: 'rgba(252,165,165,0.8)',
+  glowPulse: [
+    '0 0 0 rgba(239,68,68,0),0 4px 20px rgba(0,0,0,0.7)',
+    '0 0 32px rgba(239,68,68,0.8),0 4px 20px rgba(0,0,0,0.7)',
+    '0 0 0 rgba(239,68,68,0),0 4px 20px rgba(0,0,0,0.7)',
+  ],
+  shimmer: 'rgba(239,68,68,0.18)',
+  barColor: 'rgba(239,68,68,0.9)',
+};
+
+const occupiedTheme: ColorTheme = {
+  outer: 'rgba(99,102,241,0.2)',
+  handleBg: 'linear-gradient(180deg,rgba(30,38,65,0.97) 0%,rgba(18,24,44,0.98) 100%)',
+  handleBorder: 'rgba(99,102,241,0.25)',
+  bodyBg: 'linear-gradient(180deg,rgba(12,16,30,0.97) 0%,rgba(7,10,18,0.98) 100%)',
+  nameTxt: '#e2e8f0',
+  qtyTxt: 'rgba(148,163,184,0.7)',
+  glowPulse: ['0 4px 20px rgba(0,0,0,0.65)', '0 4px 20px rgba(0,0,0,0.65)', '0 4px 20px rgba(0,0,0,0.65)'],
+  shimmer: 'rgba(255,255,255,0.04)',
+  barColor: 'rgba(99,102,241,0.4)',
+};
+
+// ─── Magazine grid ────────────────────────────────────────────────────────────
 
 interface MagazineGridProps {
   magazine: Magazine;
@@ -16,6 +104,12 @@ interface MagazineGridProps {
 export default function MagazineGrid({ magazine, onRefresh, compact = false }: MagazineGridProps) {
   const { highlightedSlotId, notFoundBlink } = useAppStore();
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: api.settings.get,
+    staleTime: 60_000,
+  });
 
   const handleSlotClick = (slot: Slot) => {
     api.search.highlight(slot.id).catch(() => {});
@@ -33,51 +127,51 @@ export default function MagazineGrid({ magazine, onRefresh, compact = false }: M
       const largeSlot = magazine.slots.find((s) => s.row === r && s.col === 0);
       return { row: r, isLarge: true, slots: largeSlot ? [largeSlot] : [] };
     }
-    const rowSlots = magazine.slots
-      .filter((s) => s.row === r)
-      .sort((a, b) => a.col - b.col);
-    return { row: r, isLarge: false, slots: rowSlots };
+    return {
+      row: r,
+      isLarge: false,
+      slots: magazine.slots.filter((s) => s.row === r).sort((a, b) => a.col - b.col),
+    };
   });
 
   return (
     <>
-      <div className="flex flex-col gap-1 w-full">
-        {gridRows.map(({ row, isLarge, slots: rowSlots }) => (
-          <div
-            key={row}
-            className={cn(
-              'magazine-grid',
-              isLarge ? 'grid-cols-1' : `grid-cols-${Math.min(magazine.columns, 12)}`
-            )}
-            style={
-              !isLarge
-                ? { gridTemplateColumns: `repeat(${magazine.columns}, minmax(0, 1fr))` }
-                : undefined
-            }
-          >
-            {rowSlots.map((slot) => (
-              <SlotCell
-                key={slot.id}
-                slot={slot}
-                isLarge={isLarge}
-                isHighlighted={highlightedSlotId === slot.id}
-                notFoundBlink={notFoundBlink}
-                compact={compact}
-                onClick={() => handleSlotClick(slot)}
-              />
-            ))}
-            {/* Empty placeholders if slots missing */}
-            {!isLarge &&
-              rowSlots.length < magazine.columns &&
-              Array.from({ length: magazine.columns - rowSlots.length }).map((_, i) => (
-                <div
-                  key={`empty-${row}-${i}`}
-                  className={cn('rounded-lg', compact ? 'h-10' : 'h-14')}
-                  style={{ background: 'rgba(255,255,255,0.02)' }}
+      {/* Cabinet frame */}
+      <div
+        className="p-2 sm:p-2.5 rounded-2xl"
+        style={{
+          background: 'linear-gradient(160deg,#0a0e1a 0%,#070b14 100%)',
+          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.8),inset 0 -2px 4px rgba(255,255,255,0.03),0 8px 32px rgba(0,0,0,0.6)',
+          border: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        <div className="flex flex-col gap-1.5">
+          {gridRows.map(({ row, isLarge, slots: rowSlots }) => (
+            <div
+              key={row}
+              className="magazine-grid"
+              style={isLarge ? { gridTemplateColumns: '1fr' } : { gridTemplateColumns: `repeat(${magazine.columns},minmax(0,1fr))` }}
+            >
+              {rowSlots.map((slot) => (
+                <DrawerCell
+                  key={slot.id}
+                  slot={slot}
+                  isLarge={isLarge}
+                  isHighlighted={highlightedSlotId === slot.id}
+                  notFoundBlink={notFoundBlink}
+                  compact={compact}
+                  highlightRgb={settings?.search_highlight_color}
+                  onClick={() => handleSlotClick(slot)}
                 />
               ))}
-          </div>
-        ))}
+              {!isLarge &&
+                rowSlots.length < magazine.columns &&
+                Array.from({ length: magazine.columns - rowSlots.length }).map((_, i) => (
+                  <div key={`ph-${row}-${i}`} className={cn('rounded-lg', compact ? 'h-12' : 'h-[90px]')} style={{ background: 'rgba(255,255,255,0.012)' }} />
+                ))}
+            </div>
+          ))}
+        </div>
       </div>
 
       <AnimatePresence>
@@ -98,156 +192,109 @@ export default function MagazineGrid({ magazine, onRefresh, compact = false }: M
   );
 }
 
-interface SlotCellProps {
+// ─── Drawer cell ──────────────────────────────────────────────────────────────
+
+interface DrawerCellProps {
   slot: Slot;
   isLarge: boolean;
   isHighlighted: boolean;
   notFoundBlink: boolean;
   compact?: boolean;
+  highlightRgb?: string;
   onClick: () => void;
 }
 
-function SlotCell({ slot, isLarge, isHighlighted, notFoundBlink, compact = false, onClick }: SlotCellProps) {
+function DrawerCell({ slot, isLarge, isHighlighted, notFoundBlink, compact = false, highlightRgb, onClick }: DrawerCellProps) {
   const part = slot.part;
   const lowStock = part ? isLowStock(part) : false;
-
   const isEmpty = !part;
-  const isOccupied = !!part;
+
+  const theme: ColorTheme | null = isHighlighted
+    ? buildHighlightTheme(highlightRgb)
+    : lowStock
+    ? lowStockTheme
+    : notFoundBlink
+    ? notFoundTheme
+    : isEmpty
+    ? null
+    : occupiedTheme;
+
+  const height = compact ? 'h-12' : isLarge ? 'h-16' : 'h-[90px]';
+  const handleH = compact ? '40%' : '32%';
+  const isAnimated = (isHighlighted || notFoundBlink) && theme !== null;
 
   return (
     <motion.button
-      whileHover={{ scale: 1.015 }}
-      whileTap={{ scale: 0.97 }}
       onClick={onClick}
-      className={cn(
-        'relative rounded-lg text-left transition-all duration-200 overflow-hidden cursor-pointer group',
-        compact ? (isLarge ? 'h-10' : 'h-10') : isLarge ? 'h-14' : 'h-[72px]',
-        isEmpty && !notFoundBlink && 'slot-empty',
-        isOccupied && !isHighlighted && !notFoundBlink && 'slot-occupied',
-        isHighlighted && 'slot-highlighted',
-        notFoundBlink && 'slot-not-found',
-        lowStock && !isHighlighted && 'slot-low-stock'
-      )}
+      className={cn('relative rounded-lg overflow-hidden cursor-pointer group', height)}
       style={
-        lowStock && !isHighlighted
-          ? { borderColor: '#f97316', borderStyle: 'solid' }
-          : undefined
+        isEmpty
+          ? { background: 'rgba(255,255,255,0.02)', border: '1.5px dashed rgba(99,102,241,0.18)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)' }
+          : { border: `1px solid ${theme!.outer}`, boxShadow: theme!.glowPulse[0] }
+      }
+      whileHover={isEmpty ? { scale: 1.01, borderColor: 'rgba(99,102,241,0.45)' } : { y: -2, scale: 1.008 }}
+      whileTap={{ scale: 0.97, y: 0 }}
+      animate={isAnimated ? { boxShadow: theme!.glowPulse } : {}}
+      transition={
+        isAnimated
+          ? { duration: isHighlighted ? 1.4 : 0.4, repeat: isHighlighted ? Infinity : 5, ease: 'easeInOut' }
+          : { type: 'spring', stiffness: 340, damping: 28 }
       }
     >
-      {/* Background glow for highlighted */}
-      {isHighlighted && (
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: 'radial-gradient(ellipse at 50% 20%, rgba(245,158,11,0.2) 0%, transparent 70%)',
-          }}
-        />
-      )}
-
-      {/* Top-right: LED index badge */}
-      <div
-        className="absolute top-1 right-1.5 font-mono opacity-0 group-hover:opacity-30 transition-opacity"
-        style={{ fontSize: '8px', color: '#94a3b8', lineHeight: 1 }}
-      >
-        {slot.ledStart}
-      </div>
-
-      {/* Slot position label (top-left, very subtle) */}
-      {!compact && (
-        <div
-          className="absolute top-1 left-1.5 font-mono opacity-20"
-          style={{ fontSize: '8px', color: '#94a3b8', lineHeight: 1 }}
-        >
-          {slot.row + 1}·{slot.col + 1}
+      {isEmpty ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-slate-700 group-hover:text-slate-500 transition-colors">
+          <Plus className={compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} strokeWidth={1.5} />
+          {!compact && <span className="text-[10px] font-medium tracking-widest uppercase">Leer</span>}
         </div>
-      )}
+      ) : (
+        <>
+          {/* Handle / label strip */}
+          <div
+            className="absolute left-0 right-0 top-0 flex items-center justify-center px-2 overflow-hidden"
+            style={{ height: handleH, background: theme!.handleBg, borderBottom: `1px solid ${theme!.handleBorder}` }}
+          >
+            {/* Glass shimmer */}
+            <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(180deg,${theme!.shimmer} 0%,transparent 100%)` }} />
+            {/* Top specular */}
+            <div className="absolute top-0 left-[10%] right-[10%] h-px" style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.18) 40%,rgba(255,255,255,0.18) 60%,transparent)' }} />
 
-      {/* Content */}
-      <div className={cn('h-full flex flex-col justify-between', compact ? 'p-1.5' : 'p-2.5')}>
-        {isEmpty ? (
-          <div className="flex items-center justify-center h-full gap-1.5 text-slate-600 group-hover:text-slate-500 transition-colors">
-            <Plus className={cn(compact ? 'w-3 h-3' : 'w-3.5 h-3.5')} />
-            {!compact && <span className="text-xs font-medium">Leer</span>}
-          </div>
-        ) : (
-          <>
-            <div className="flex items-start gap-1 min-w-0">
-              {isHighlighted ? (
-                <Zap
-                  className={cn('flex-shrink-0 text-led-on', compact ? 'w-3 h-3 mt-0' : 'w-3.5 h-3.5 mt-0.5')}
-                  fill="currentColor"
-                />
-              ) : lowStock ? (
-                <AlertTriangle
-                  className={cn('flex-shrink-0 text-led-low', compact ? 'w-3 h-3 mt-0' : 'w-3.5 h-3.5 mt-0.5')}
-                />
-              ) : (
-                <Package
-                  className={cn('flex-shrink-0 text-slate-500', compact ? 'w-3 h-3 mt-0' : 'w-3.5 h-3.5 mt-0.5')}
-                />
-              )}
-              <p
-                className={cn(
-                  'font-semibold leading-tight truncate min-w-0',
-                  compact ? 'text-[10px]' : 'text-xs',
-                  isHighlighted ? 'text-led-on' : lowStock ? 'text-led-low' : 'text-slate-200'
-                )}
-              >
-                {part!.name}
-              </p>
-            </div>
+            {isHighlighted && <Zap className="absolute left-2 w-2.5 h-2.5 flex-shrink-0" style={{ color: theme!.qtyTxt }} fill="currentColor" />}
+
+            <p className={cn('font-semibold text-center leading-none w-full truncate', compact ? 'text-[9px]' : 'text-[11px]')} style={{ color: theme!.nameTxt, textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
+              {part!.name}
+            </p>
 
             {!compact && (
-              <div className="flex items-end justify-between gap-1 mt-auto">
-                <p
-                  className={cn(
-                    'text-xs font-mono tabular-nums',
-                    isHighlighted ? 'text-led-on/70' : lowStock ? 'text-led-low/70' : 'text-slate-500'
-                  )}
-                >
-                  {formatQuantity(part!.quantity, part!.unit)}
-                </p>
+              <span className="absolute right-1.5 font-mono opacity-0 group-hover:opacity-30 transition-opacity" style={{ fontSize: '7px', color: '#94a3b8' }}>
+                {slot.row + 1}.{slot.col + 1}
+              </span>
+            )}
+          </div>
 
-                {/* Tag dots */}
-                {part!.tags.length > 0 && (
-                  <div className="flex gap-0.5 flex-shrink-0">
-                    {part!.tags.slice(0, 3).map((tag) => (
-                      <div
-                        key={tag}
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: 'rgba(99,102,241,0.5)' }}
-                        title={tag}
-                      />
-                    ))}
-                    {part!.tags.length > 3 && (
-                      <div
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: 'rgba(99,102,241,0.25)' }}
-                        title={`+${part!.tags.length - 3} weitere`}
-                      />
-                    )}
-                  </div>
-                )}
+          {/* Drawer body */}
+          <div className="absolute left-0 right-0 bottom-0 flex flex-col items-center justify-center" style={{ top: handleH, background: theme!.bodyBg }}>
+            {/* Inner depth shadow */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 pointer-events-none" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.5) 0%,transparent 100%)' }} />
+
+            <p className={cn('font-mono tabular-nums font-bold text-center', compact ? 'text-[9px]' : 'text-sm')} style={{ color: theme!.qtyTxt, textShadow: `0 0 10px ${theme!.qtyTxt}` }}>
+              {formatQuantity(part!.quantity, part!.unit)}
+            </p>
+
+            {!compact && part!.tags.length > 0 && (
+              <div className="flex gap-0.5 mt-1">
+                {part!.tags.slice(0, 4).map((tag) => (
+                  <div key={tag} className="w-1 h-1 rounded-full" style={{ background: theme!.barColor }} title={tag} />
+                ))}
               </div>
             )}
-          </>
-        )}
-      </div>
+          </div>
 
-      {/* Low-stock accent line at bottom */}
-      {lowStock && !isHighlighted && (
-        <div
-          className="absolute bottom-0 left-0 right-0 h-0.5"
-          style={{ background: 'linear-gradient(90deg, transparent, #f97316, transparent)' }}
-        />
-      )}
-
-      {/* Highlighted accent line at bottom */}
-      {isHighlighted && (
-        <div
-          className="absolute bottom-0 left-0 right-0 h-0.5"
-          style={{ background: 'linear-gradient(90deg, transparent, #f59e0b, transparent)' }}
-        />
+          {/* Bottom accent bar */}
+          <div
+            className="absolute bottom-0 left-0 right-0 h-[2px]"
+            style={{ background: `linear-gradient(90deg,transparent 0%,${theme!.barColor} 25%,${theme!.barColor} 75%,transparent 100%)`, opacity: isHighlighted || lowStock ? 0.9 : 0.4 }}
+          />
+        </>
       )}
     </motion.button>
   );

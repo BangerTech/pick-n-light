@@ -76,40 +76,12 @@ pre {
   box-shadow: 0 0 20px rgba(99, 102, 241, 0.08);
 }
 
-/* LED slot states */
-.slot-empty {
-  background: rgba(30, 41, 59, 0.5);
-  border: 1.5px dashed rgba(71, 85, 105, 0.4);
-  transition: all 0.2s ease;
-}
-.slot-empty:hover {
-  background: rgba(99, 102, 241, 0.08);
-  border-color: rgba(99, 102, 241, 0.4);
-  box-shadow: 0 0 12px rgba(99, 102, 241, 0.15);
-}
-
-.slot-occupied {
-  background: rgba(30, 41, 59, 0.8);
-  border: 1.5px solid rgba(71, 85, 105, 0.5);
-  transition: all 0.2s ease;
-}
-.slot-occupied:hover {
-  border-color: rgba(99, 102, 241, 0.5);
-  box-shadow: 0 0 12px rgba(99, 102, 241, 0.15);
-}
-
-.slot-highlighted {
-  background: rgba(245, 158, 11, 0.12) !important;
-  border: 1.5px solid var(--led-amber) !important;
-  animation: led-pulse 1.4s ease-in-out infinite;
-}
+/* LED slot states — visual styles are now handled via inline styles in MagazineGrid.tsx;
+   only keyframe-based animation classes remain here */
 
 .slot-not-found {
   animation: led-blink 0.4s ease-in-out 6;
-}
-
-.slot-low-stock {
-  border-color: #f97316 !important;
+  pointer-events: none;
 }
 
 /* Neon text */
@@ -235,7 +207,7 @@ pre {
 /* Magazine grid */
 .magazine-grid {
   display: grid;
-  gap: 4px;
+  gap: 5px;
 }
 
 /* Hide scrollbar but keep scroll functionality */
