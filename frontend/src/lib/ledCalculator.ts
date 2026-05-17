@@ -1,14 +1,29 @@
 export type StripOrigin = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
+/**
+ * Row layout in physical strip order:
+ *   [rowPadding] [slot0] [ledGap] [slot1] … [slotN] [rowPadding]
+ *
+ * rowPadding = LEDs to skip at BOTH ends of every physical row.
+ * Example: rowPadding=1, ledsPerSlot=4, columns=4, ledGap=0
+ *   → 1 + 4+4+4+4 + 1 = 18 LEDs per row  ✓
+ */
 export function totalLedCount(
   rows: number,
   columns: number,
   ledsPerSlot: number,
-  _bottomRowLarge: boolean,
-  ledGap = 0
+  bottomRowLarge: boolean,
+  ledGap = 0,
+  ledSkipFirst = 0,
+  largeRowLeds = 0,
+  rowPadding = 0
 ): number {
-  const ledsPerRow = columns * ledsPerSlot + Math.max(0, columns - 1) * ledGap;
-  return rows * ledsPerRow;
+  const activeWidth = columns * ledsPerSlot + Math.max(0, columns - 1) * ledGap;
+  const ledsPerRow = rowPadding + activeWidth + rowPadding;
+  const largeActiveWidth = bottomRowLarge && largeRowLeds > 0 ? largeRowLeds : activeWidth;
+  const largeRowTotal = rowPadding + largeActiveWidth + rowPadding;
+  const regularRows = bottomRowLarge ? rows - 1 : rows;
+  return ledSkipFirst + regularRows * ledsPerRow + (bottomRowLarge ? largeRowTotal : 0);
 }
 
 export function calculateSlotsClient(
@@ -18,33 +33,46 @@ export function calculateSlotsClient(
   bottomRowLarge: boolean,
   ledGap = 0,
   serpentine = false,
-  stripOrigin: StripOrigin = 'top-left'
+  stripOrigin: StripOrigin = 'top-left',
+  ledSkipFirst = 0,
+  largeRowLeds = 0,
+  rowPadding = 0
 ): { row: number; col: number; ledStart: number; ledCount: number; isLarge: boolean }[] {
   const slots: { row: number; col: number; ledStart: number; ledCount: number; isLarge: boolean }[] = [];
   const step = ledsPerSlot + ledGap;
-  const ledsPerRow = columns * ledsPerSlot + Math.max(0, columns - 1) * ledGap;
+  const activeWidth = columns * ledsPerSlot + Math.max(0, columns - 1) * ledGap;
+  const ledsPerRow = rowPadding + activeWidth + rowPadding;
+  const largeActiveWidth = bottomRowLarge && largeRowLeds > 0 ? largeRowLeds : activeWidth;
+  const largeRowTotal = rowPadding + largeActiveWidth + rowPadding;
 
   const stacksDown = stripOrigin.startsWith('top');
   const firstRowReversed = stripOrigin.endsWith('right');
 
+  const rowStarts: number[] = [];
+  let cursor = ledSkipFirst;
+  for (let p = 0; p < rows; p++) {
+    rowStarts.push(cursor);
+    const logicalRow = stacksDown ? p : rows - 1 - p;
+    cursor += bottomRowLarge && logicalRow === rows - 1 ? largeRowTotal : ledsPerRow;
+  }
+
   for (let logicalRow = 0; logicalRow < rows; logicalRow++) {
     const isLargeRow = bottomRowLarge && logicalRow === rows - 1;
-
-    const physicalRowIdx = stacksDown ? logicalRow : rows - 1 - logicalRow;
-    const rowStart = physicalRowIdx * ledsPerRow;
-
-    const reversed = serpentine
-      ? (physicalRowIdx % 2 === 0 ? firstRowReversed : !firstRowReversed)
-      : firstRowReversed;
+    const physIdx = stacksDown ? logicalRow : rows - 1 - logicalRow;
+    const rowStart = rowStarts[physIdx];
 
     if (isLargeRow) {
-      slots.push({ row: logicalRow, col: 0, ledStart: rowStart, ledCount: ledsPerRow, isLarge: true });
+      slots.push({ row: logicalRow, col: 0, ledStart: rowStart + rowPadding, ledCount: largeActiveWidth, isLarge: true });
       continue;
     }
 
+    const reversed = serpentine
+      ? (physIdx % 2 === 0 ? firstRowReversed : !firstRowReversed)
+      : firstRowReversed;
+
     for (let logicalCol = 0; logicalCol < columns; logicalCol++) {
-      const physicalCol = reversed ? columns - 1 - logicalCol : logicalCol;
-      const ledStart = rowStart + physicalCol * step;
+      const physCol = reversed ? columns - 1 - logicalCol : logicalCol;
+      const ledStart = rowStart + rowPadding + physCol * step;
       slots.push({ row: logicalRow, col: logicalCol, ledStart, ledCount: ledsPerSlot, isLarge: false });
     }
   }

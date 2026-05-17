@@ -42,9 +42,12 @@ export interface Magazine {
   columns: number;
   ledsPerSlot: number;
   ledGap: number;
+  ledSkipFirst: number;
+  rowPadding: number;
   serpentine: boolean;
   stripOrigin: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   bottomRowLarge: boolean;
+  largeRowLeds: number;
   createdAt: string;
   updatedAt: string;
   slots: Slot[];

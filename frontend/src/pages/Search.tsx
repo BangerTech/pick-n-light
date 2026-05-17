@@ -67,12 +67,12 @@ export default function Search() {
   };
 
   return (
-    <div className="h-full flex flex-col items-center px-6 py-8 overflow-auto">
+    <div className="h-full flex flex-col items-center px-4 sm:px-6 py-5 sm:py-8 overflow-auto">
       {/* Header */}
       <div className="w-full max-w-2xl">
-        <div className="mb-8 text-center">
+        <div className="mb-5 sm:mb-8 text-center">
           <h1
-            className="text-3xl font-bold mb-2"
+            className="text-2xl sm:text-3xl font-bold mb-2"
             style={{
               background: 'linear-gradient(135deg, #f1f5f9, #94a3b8)',
               WebkitBackgroundClip: 'text',

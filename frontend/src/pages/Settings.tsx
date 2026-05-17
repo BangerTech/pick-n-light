@@ -171,8 +171,8 @@ export default function Settings() {
   }
 
   return (
-    <div className="h-full overflow-auto px-6 py-8">
-      <div className="max-w-3xl mx-auto flex flex-col gap-8">
+    <div className="h-full overflow-auto px-4 sm:px-6 py-5 sm:py-8">
+      <div className="max-w-3xl mx-auto flex flex-col gap-6 sm:gap-8">
         {/* Header */}
         <div>
           <h1

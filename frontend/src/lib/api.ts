@@ -26,11 +26,23 @@ export const api = {
       columns: number;
       ledsPerSlot: number;
       ledGap: number;
+      ledSkipFirst: number;
+      rowPadding: number;
       serpentine: boolean;
       stripOrigin: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
       bottomRowLarge: boolean;
+      largeRowLeds: number;
     }) => req<Magazine>('POST', '/magazines', data),
-    update: (id: number, data: { name?: string; ledsPerSlot?: number; ledGap?: number; serpentine?: boolean; stripOrigin?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' }) => req<Magazine>('PUT', `/magazines/${id}`, data),
+    update: (id: number, data: {
+      name?: string;
+      ledsPerSlot?: number;
+      ledGap?: number;
+      ledSkipFirst?: number;
+      rowPadding?: number;
+      serpentine?: boolean;
+      stripOrigin?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+      largeRowLeds?: number;
+    }) => req<Magazine>('PUT', `/magazines/${id}`, data),
     delete: (id: number) => req<{ success: boolean }>('DELETE', `/magazines/${id}`),
     duplicate: (id: number) => req<Magazine>('POST', `/magazines/${id}/duplicate`),
   },
@@ -63,12 +75,24 @@ export const api = {
     update: (id: number, data: Partial<WledDevice>) =>
       req<WledDevice>('PUT', `/wled/devices/${id}`, data),
     delete: (id: number) => req<{ success: boolean }>('DELETE', `/wled/devices/${id}`),
-    test: (id: number, mode: 'flash' | 'sequence' = 'flash', delayMs?: number) =>
+    test: (
+      id: number,
+      mode: 'flash' | 'sequence' = 'flash',
+      delayMs?: number,
+      totalLedsOverride?: number,
+      slotOverrides?: { ledStart: number; ledCount: number }[]
+    ) =>
       req<{ success: boolean; message: string; mqttTopic: string; messagesCount: number }>(
-        'POST', `/wled/devices/${id}/test`, { mode, delayMs }
+        'POST', `/wled/devices/${id}/test`, { mode, delayMs, totalLedsOverride, slotOverrides }
       ),
-    lightRange: (id: number, ledStart: number, ledCount: number, color?: [number, number, number]) =>
-      req<{ success: boolean }>('POST', `/wled/devices/${id}/light-range`, { ledStart, ledCount, color }),
+    lightRange: (
+      id: number,
+      ledStart: number,
+      ledCount: number,
+      color?: [number, number, number],
+      totalLedsOverride?: number
+    ) =>
+      req<{ success: boolean }>('POST', `/wled/devices/${id}/light-range`, { ledStart, ledCount, color, totalLedsOverride }),
     allOff: (id: number) =>
       req<{ success: boolean }>('POST', `/wled/devices/${id}/all-off`),
   },
@@ -76,5 +100,9 @@ export const api = {
   settings: {
     get: () => req<Settings>('GET', '/settings'),
     update: (data: Partial<Settings>) => req<{ success: boolean }>('PUT', '/settings', data),
+  },
+
+  tags: {
+    list: () => req<string[]>('GET', '/tags'),
   },
 };

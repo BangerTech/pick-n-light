@@ -48,11 +48,15 @@ function publish(topic: string, payload: object): Promise<void> {
  *
  * This ensures LEDs outside the slot do NOT light up unintentionally.
  */
+// Sentinel: tells WLED "from here to end of strip". WLED clips stop to info.leds.count,
+// so this safely covers any strip length without us needing to know the exact LED count.
+const FULL_STRIP = 9999;
+
 export function lightSlot(
   mqttTopic: string,
   ledStart: number,
   ledCount: number,
-  totalLeds: number,
+  _totalLeds: number, // kept for API compatibility; we use FULL_STRIP instead
   color: [number, number, number] = [255, 165, 0],
   autoOffSeconds?: number
 ): void {
@@ -67,8 +71,8 @@ export function lightSlot(
     on: true,
     bri: 255,
     seg: [
-      // Segment 0: full strip as dark background
-      { id: 0, start: 0, stop: totalLeds, col: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], fx: 0, on: true },
+      // Segment 0: full strip as dark background (FULL_STRIP is clipped by WLED to its actual LED count)
+      { id: 0, start: 0, stop: FULL_STRIP, col: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], fx: 0, on: true },
       // Segment 1: only the target slot
       { id: 1, start: ledStart, stop: ledStart + ledCount, col: [color, [0, 0, 0], [0, 0, 0]], fx: 0, on: true },
     ],
@@ -96,18 +100,18 @@ export function turnOffAll(mqttTopic: string): void {
  */
 export function flashAll(
   mqttTopic: string,
-  totalLeds: number,
+  _totalLeds: number, // kept for API compatibility; FULL_STRIP sentinel is used instead
   color: [number, number, number] = [0, 200, 255],
   persistent = true,
   durationMs = 3000
 ): void {
-  // Clear any segment-1 overrides so the full strip is visible
+  // Use FULL_STRIP so WLED lights every LED regardless of how many there are
   publish(mqttTopic, {
     on: true,
     bri: 255,
     seg: [
-      { id: 0, start: 0, stop: totalLeds, col: [color, [0, 0, 0], [0, 0, 0]], fx: 0, on: true },
-      { id: 1, start: 0, stop: 0 }, // remove segment 1 if it existed
+      { id: 0, start: 0, stop: FULL_STRIP, col: [color, [0, 0, 0], [0, 0, 0]], fx: 0, on: true },
+      { id: 1, start: 0, stop: 0 }, // delete segment 1 (any previous slot highlight)
     ],
   });
 
@@ -119,7 +123,7 @@ export function flashAll(
 /**
  * Blink all LEDs red (no match found during search).
  */
-export function blinkAllRed(mqttTopic: string, totalLeds: number): void {
+export function blinkAllRed(mqttTopic: string, _totalLeds: number): void {
   publish(mqttTopic, {
     on: true,
     bri: 255,
@@ -127,7 +131,7 @@ export function blinkAllRed(mqttTopic: string, totalLeds: number): void {
       {
         id: 0,
         start: 0,
-        stop: totalLeds,
+        stop: FULL_STRIP,
         col: [[255, 0, 0], [0, 0, 0], [0, 0, 0]],
         fx: 1,   // blink effect
         ix: 220,
@@ -166,7 +170,7 @@ export async function runTestSequence(
       on: true,
       bri: 255,
       seg: [
-        { id: 0, start: 0, stop: totalLeds, col: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], fx: 0, on: true },
+        { id: 0, start: 0, stop: FULL_STRIP, col: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], fx: 0, on: true },
         { id: 1, start: slot.ledStart, stop: slot.ledStart + slot.ledCount, col: [[0, 200, 255], [0, 0, 0], [0, 0, 0]], fx: 0, on: true },
       ],
     });

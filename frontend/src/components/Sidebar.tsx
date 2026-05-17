@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { LayoutGrid, Search, Settings, Zap } from 'lucide-react';
+import { LayoutGrid, Search, Settings } from 'lucide-react';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -28,16 +28,13 @@ export default function Sidebar() {
       }}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-white/5">
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{
-            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-            boxShadow: '0 0 16px rgba(245,158,11,0.4)',
-          }}
-        >
-          <Zap className="w-4 h-4 text-white" fill="white" />
-        </div>
+      <div className="flex items-center gap-3 px-3 py-4 border-b border-white/5">
+        <img
+          src="/logo.png"
+          alt="Pick·n·Light"
+          className="w-9 h-9 rounded-xl flex-shrink-0 object-cover"
+          style={{ boxShadow: '0 0 14px rgba(245,158,11,0.35)' }}
+        />
         <div className="hidden lg:block overflow-hidden">
           <p className="text-sm font-bold text-white leading-tight tracking-wide">Pick·n·Light</p>
           <p className="text-xs text-slate-500 leading-tight">LED Lager System</p>

@@ -56,7 +56,19 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { name, rows, columns, ledsPerSlot = 3, ledGap = 0, serpentine = false, stripOrigin = 'top-left', bottomRowLarge = false } = req.body;
+    const {
+      name,
+      rows,
+      columns,
+      ledsPerSlot = 3,
+      ledGap = 0,
+      ledSkipFirst = 0,
+      rowPadding = 0,
+      serpentine = false,
+      stripOrigin = 'top-left',
+      bottomRowLarge = false,
+      largeRowLeds = 0,
+    } = req.body;
 
     if (!name || !rows || !columns) {
       res.status(400).json({ error: 'name, rows and columns are required' });
@@ -64,10 +76,10 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     const magazine = await prisma.magazine.create({
-      data: { name, rows, columns, ledsPerSlot, ledGap, serpentine, stripOrigin, bottomRowLarge },
+      data: { name, rows, columns, ledsPerSlot, ledGap, ledSkipFirst, rowPadding, serpentine, stripOrigin, bottomRowLarge, largeRowLeds },
     });
 
-    const slotDefs = calculateSlots(rows, columns, ledsPerSlot, bottomRowLarge, ledGap, serpentine, stripOrigin);
+    const slotDefs = calculateSlots(rows, columns, ledsPerSlot, bottomRowLarge, ledGap, serpentine, stripOrigin, ledSkipFirst, largeRowLeds, rowPadding);
 
     await prisma.slot.createMany({
       data: slotDefs.map((s) => ({
@@ -97,9 +109,18 @@ router.post('/', async (req: Request, res: Response) => {
 router.put('/:id', async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id as string);
-    const { name, ledsPerSlot, ledGap, serpentine, stripOrigin } = req.body;
+    const { name, ledsPerSlot, ledGap, ledSkipFirst, rowPadding, serpentine, stripOrigin, largeRowLeds } = req.body;
 
-    if (ledsPerSlot !== undefined || ledGap !== undefined || serpentine !== undefined || stripOrigin !== undefined) {
+    const layoutChanged =
+      ledsPerSlot !== undefined ||
+      ledGap !== undefined ||
+      ledSkipFirst !== undefined ||
+      rowPadding !== undefined ||
+      serpentine !== undefined ||
+      stripOrigin !== undefined ||
+      largeRowLeds !== undefined;
+
+    if (layoutChanged) {
       const mag = await prisma.magazine.findUnique({ where: { id } });
       if (!mag) {
         res.status(404).json({ error: 'Magazine not found' });
@@ -108,12 +129,26 @@ router.put('/:id', async (req: Request, res: Response) => {
 
       const newLedsPerSlot = ledsPerSlot ?? mag.ledsPerSlot;
       const newLedGap = ledGap ?? mag.ledGap;
+      const newLedSkipFirst = ledSkipFirst ?? mag.ledSkipFirst;
+      const newRowPadding = rowPadding ?? mag.rowPadding;
       const newSerpentine = serpentine ?? mag.serpentine;
       const newStripOrigin = (stripOrigin ?? mag.stripOrigin) as 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+      const newLargeRowLeds = largeRowLeds ?? mag.largeRowLeds;
 
       await prisma.slot.deleteMany({ where: { magazineId: id } });
 
-      const slotDefs = calculateSlots(mag.rows, mag.columns, newLedsPerSlot, mag.bottomRowLarge, newLedGap, newSerpentine, newStripOrigin);
+      const slotDefs = calculateSlots(
+        mag.rows,
+        mag.columns,
+        newLedsPerSlot,
+        mag.bottomRowLarge,
+        newLedGap,
+        newSerpentine,
+        newStripOrigin,
+        newLedSkipFirst,
+        newLargeRowLeds,
+        newRowPadding
+      );
       await prisma.slot.createMany({
         data: slotDefs.map((s) => ({
           magazineId: id,
@@ -130,8 +165,11 @@ router.put('/:id', async (req: Request, res: Response) => {
         data: {
           ledsPerSlot: newLedsPerSlot,
           ledGap: newLedGap,
+          ledSkipFirst: newLedSkipFirst,
+          rowPadding: newRowPadding,
           serpentine: newSerpentine,
           stripOrigin: newStripOrigin,
+          largeRowLeds: newLargeRowLeds,
           ...(name !== undefined && { name }),
         },
       });
@@ -181,9 +219,12 @@ router.post('/:id/duplicate', async (req: Request, res: Response) => {
         columns: source.columns,
         ledsPerSlot: source.ledsPerSlot,
         ledGap: source.ledGap,
+        ledSkipFirst: source.ledSkipFirst,
+        rowPadding: source.rowPadding,
         serpentine: source.serpentine,
         stripOrigin: source.stripOrigin,
         bottomRowLarge: source.bottomRowLarge,
+        largeRowLeds: source.largeRowLeds,
       },
     });
 

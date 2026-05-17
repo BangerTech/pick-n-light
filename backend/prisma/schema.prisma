@@ -14,9 +14,12 @@ model Magazine {
   columns        Int
   ledsPerSlot    Int          @default(3) @map("leds_per_slot")
   ledGap         Int          @default(0) @map("led_gap")
+  ledSkipFirst   Int          @default(0) @map("led_skip_first")
+  rowPadding     Int          @default(0) @map("row_padding")
   serpentine     Boolean      @default(false)
   stripOrigin    String       @default("top-left") @map("strip_origin")
   bottomRowLarge Boolean      @default(false) @map("bottom_row_large")
+  largeRowLeds   Int          @default(0) @map("large_row_leds")
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
   slots          Slot[]

@@ -80,7 +80,7 @@ router.delete('/devices/:id', async (req: Request, res: Response) => {
 router.post('/devices/:id/light-range', async (req: Request, res: Response) => {
   try {
     const id = parseInt(req.params.id as string);
-    const { ledStart, ledCount, color } = req.body;
+    const { ledStart, ledCount, color, totalLedsOverride } = req.body;
 
     const device = await prisma.wledDevice.findUnique({
       where: { id },
@@ -88,13 +88,10 @@ router.post('/devices/:id/light-range', async (req: Request, res: Response) => {
     });
     if (!device) { res.status(404).json({ error: 'Device not found' }); return; }
 
-    const leds = totalLedCount(
-      device.magazine.rows,
-      device.magazine.columns,
-      device.magazine.ledsPerSlot,
-      device.magazine.bottomRowLarge,
-      device.magazine.ledGap
-    );
+    const m = device.magazine;
+    const leds = typeof totalLedsOverride === 'number' && totalLedsOverride > 0
+      ? totalLedsOverride
+      : totalLedCount(m.rows, m.columns, m.ledsPerSlot, m.bottomRowLarge, m.ledGap, m.ledSkipFirst, m.largeRowLeds, m.rowPadding);
 
     const rgb: [number, number, number] =
       Array.isArray(color) && color.length === 3
@@ -139,24 +136,20 @@ router.post('/devices/:id/test', async (req: Request, res: Response) => {
       return;
     }
 
-    const leds = totalLedCount(
-      device.magazine.rows,
-      device.magazine.columns,
-      device.magazine.ledsPerSlot,
-      device.magazine.bottomRowLarge,
-      device.magazine.ledGap
-    );
+    const m2 = device.magazine;
+    const { mode: modeRaw, delayMs: delayMsRaw, totalLedsOverride, slotOverrides } = req.body;
+    const leds = typeof totalLedsOverride === 'number' && totalLedsOverride > 0
+      ? totalLedsOverride
+      : totalLedCount(m2.rows, m2.columns, m2.ledsPerSlot, m2.bottomRowLarge, m2.ledGap, m2.ledSkipFirst, m2.largeRowLeds, m2.rowPadding);
 
-    const mode = (req.body.mode as string) || 'flash';
+    const mode = (modeRaw as string) || 'flash';
 
     if (mode === 'sequence') {
-      const delayMs = parseInt(req.body.delayMs || '400', 10);
-      runTestSequence(
-        device.mqttTopic,
-        device.magazine.slots.map((s) => ({ ledStart: s.ledStart, ledCount: s.ledCount })),
-        leds,
-        delayMs
-      );
+      const delayMs = parseInt(delayMsRaw || '400', 10);
+      const slots = Array.isArray(slotOverrides) && slotOverrides.length > 0
+        ? slotOverrides as { ledStart: number; ledCount: number }[]
+        : device.magazine.slots.map((s) => ({ ledStart: s.ledStart, ledCount: s.ledCount }));
+      runTestSequence(device.mqttTopic, slots, leds, delayMs);
       res.json({
         success: true,
         message: 'Sequence test started',

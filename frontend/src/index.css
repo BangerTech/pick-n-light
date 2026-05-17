@@ -22,9 +22,12 @@
 }
 
 html,
-body,
+body {
+  margin: 0;
+  padding: 0;
+}
+
 #root {
-  height: 100%;
   margin: 0;
   padding: 0;
 }
@@ -35,7 +38,6 @@ body {
   color: #e2e8f0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden;
 }
 
 code,
@@ -234,6 +236,22 @@ pre {
 .magazine-grid {
   display: grid;
   gap: 4px;
+}
+
+/* Hide scrollbar but keep scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile safe-area padding */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
 /* Onboarding step indicator */

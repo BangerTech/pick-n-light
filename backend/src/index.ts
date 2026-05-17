@@ -9,6 +9,7 @@ import searchRouter from './routes/search';
 import wledRouter from './routes/wled';
 import voiceRouter from './routes/voice';
 import settingsRouter from './routes/settings';
+import tagsRouter from './routes/tags';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -22,6 +23,7 @@ app.use('/api/search', searchRouter);
 app.use('/api/wled', wledRouter);
 app.use('/api/voice', voiceRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/tags', tagsRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

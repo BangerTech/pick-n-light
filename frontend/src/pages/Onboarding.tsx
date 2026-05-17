@@ -57,9 +57,12 @@ export default function Onboarding() {
   // Step 4 — LEDs
   const [ledsPerSlot, setLedsPerSlot] = useState(3);
   const [ledGap, setLedGap] = useState(0);
+  const [rowPadding, setRowPadding] = useState(0);
   const [serpentine, setSerpentine] = useState(false);
   const [stripOrigin, setStripOrigin] = useState<'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('top-left');
-  const [showGapOption, setShowGapOption] = useState(false);
+  const [ledSkipFirst, setLedSkipFirst] = useState(0);
+  const [largeRowLeds, setLargeRowLeds] = useState(0);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const [testRunning, setTestRunning] = useState(false);
   const [testError, setTestError] = useState('');
   const [litSlotIdx, setLitSlotIdx] = useState<number | null>(null);
@@ -69,8 +72,8 @@ export default function Onboarding() {
   const [createdDeviceId, setCreatedDeviceId] = useState<number | null>(null);
 
   const totalLeds = useMemo(
-    () => totalLedCount(rows, columns, ledsPerSlot, bottomRowLarge, ledGap),
-    [rows, columns, ledsPerSlot, bottomRowLarge, ledGap]
+    () => totalLedCount(rows, columns, ledsPerSlot, bottomRowLarge, ledGap, ledSkipFirst, largeRowLeds, rowPadding),
+    [rows, columns, ledsPerSlot, bottomRowLarge, ledGap, ledSkipFirst, largeRowLeds, rowPadding]
   );
 
   const goNext = () => { setDir(1); setStep((s) => s + 1); };
@@ -85,15 +88,18 @@ export default function Onboarding() {
         columns,
         ledsPerSlot,
         ledGap,
+        ledSkipFirst,
+        rowPadding,
         serpentine,
         stripOrigin,
         bottomRowLarge,
+        largeRowLeds,
       });
       setCreatedMagazineId(mag.id);
 
       if (!skipWled && mqttTopic) {
         // Use the physical strip length (what the user entered) so WLED commands address ALL LEDs
-        const physicalLeds = stripLedCount ?? totalLedCount(rows, columns, ledsPerSlot, bottomRowLarge, ledGap);
+        const physicalLeds = stripLedCount ?? totalLedCount(rows, columns, ledsPerSlot, bottomRowLarge, ledGap, ledSkipFirst, largeRowLeds);
         const dev = await api.wled.create({
           magazineId: mag.id,
           name: wledName || 'WLED Gerät 1',
@@ -111,13 +117,15 @@ export default function Onboarding() {
     onSuccess: () => goNext(),
   });
 
-  // Step 4: update ledsPerSlot, ledGap, serpentine, stripOrigin (recalculates slots) + ensure device ledCount matches physical strip
+  // Step 4: save config, sync device LED count, turn off LEDs, advance to Done
   const finalizeLedsPerSlot = useMutation({
     mutationFn: async () => {
       if (createdMagazineId !== null) {
-        await api.magazines.update(createdMagazineId, { ledsPerSlot, ledGap, serpentine, stripOrigin });
+        await api.magazines.update(createdMagazineId, { ledsPerSlot, ledGap, ledSkipFirst, rowPadding, serpentine, stripOrigin, largeRowLeds });
         if (createdDeviceId !== null) {
           await api.wled.update(createdDeviceId, { ledCount: stripLedCount ?? totalLeds });
+          // Turn off any LEDs that were lit during testing
+          await api.wled.allOff(createdDeviceId).catch(() => {});
         }
       }
       await queryClient.invalidateQueries({ queryKey: ['magazines'] });
@@ -128,8 +136,8 @@ export default function Onboarding() {
 
   // Calculate slot definitions client-side (mirrors backend logic)
   const calcSlots = useMemo(
-    () => calculateSlotsClient(rows, columns, ledsPerSlot, bottomRowLarge, ledGap, serpentine, stripOrigin),
-    [rows, columns, ledsPerSlot, bottomRowLarge, ledGap, serpentine, stripOrigin]
+    () => calculateSlotsClient(rows, columns, ledsPerSlot, bottomRowLarge, ledGap, serpentine, stripOrigin, ledSkipFirst, largeRowLeds, rowPadding),
+    [rows, columns, ledsPerSlot, bottomRowLarge, ledGap, serpentine, stripOrigin, ledSkipFirst, largeRowLeds, rowPadding]
   );
 
   const handleLightSlot = async (slotIdx: number) => {
@@ -139,7 +147,7 @@ export default function Onboarding() {
     setLitSlotIdx(slotIdx);
     setTestError('');
     try {
-      await api.wled.lightRange(createdDeviceId, slot.ledStart, slot.ledCount, [0, 200, 255]);
+      await api.wled.lightRange(createdDeviceId, slot.ledStart, slot.ledCount, [0, 200, 255], totalLeds);
     } catch {
       setTestError('WLED nicht erreichbar. Prüfe Broker-Verbindung.');
     }
@@ -156,8 +164,8 @@ export default function Onboarding() {
     setLitSlotIdx(-1); // -1 = all on
     setTestError('');
     try {
-      await api.wled.test(createdDeviceId, 'flash');
-      // No auto-off — stays on until user clicks "Alle Aus" or toggles again
+      // Pass current totalLeds so backend uses our live-calculated value, not stale DB value
+      await api.wled.test(createdDeviceId, 'flash', undefined, totalLeds);
     } catch {
       setTestError('WLED nicht erreichbar. Prüfe MQTT-Verbindung.');
       setLitSlotIdx(null);
@@ -175,7 +183,7 @@ export default function Onboarding() {
     if (!createdDeviceId) return;
     setTestError('');
     try {
-      await api.wled.lightRange(createdDeviceId, 0, 1, [255, 80, 0]);
+      await api.wled.lightRange(createdDeviceId, 0, 1, [255, 80, 0], totalLeds);
     } catch {
       setTestError('WLED nicht erreichbar. Prüfe MQTT-Verbindung.');
     }
@@ -187,8 +195,14 @@ export default function Onboarding() {
     setTestRunning(true);
     setLitSlotIdx(null);
     try {
-      await api.wled.test(createdDeviceId, 'sequence', 600);
-      // Animate through slots in UI as well
+      // Pass live-calculated slots + totalLeds so backend uses current UI state, not stale DB
+      await api.wled.test(
+        createdDeviceId,
+        'sequence',
+        600,
+        totalLeds,
+        calcSlots.map(s => ({ ledStart: s.ledStart, ledCount: s.ledCount }))
+      );
       for (let i = 0; i < calcSlots.length; i++) {
         await new Promise<void>(res => setTimeout(() => { setLitSlotIdx(i); res(); }, i * 680));
       }
@@ -203,24 +217,27 @@ export default function Onboarding() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden"
+      className="min-h-screen w-full relative"
       style={{ background: '#07090f' }}
     >
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.12) 0%, transparent 70%)',
-        }}
-      />
-      <div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-96 h-64 pointer-events-none"
-        style={{
-          background: 'radial-gradient(ellipse at 50% 100%, rgba(245,158,11,0.06) 0%, transparent 70%)',
-        }}
-      />
+      {/* Fixed background gradients (do not scroll) */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99,102,241,0.12) 0%, transparent 70%)',
+          }}
+        />
+        <div
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-96 h-64"
+          style={{
+            background: 'radial-gradient(ellipse at 50% 100%, rgba(245,158,11,0.06) 0%, transparent 70%)',
+          }}
+        />
+      </div>
 
-      <div className="w-full max-w-2xl relative z-10">
+      <div className="w-full max-w-2xl relative z-10 mx-auto px-4 sm:px-6 py-6 sm:py-10">
         {/* Step indicators */}
         <div className="flex items-center justify-center gap-2 mb-10">
           {steps.map((s, i) => {
@@ -266,9 +283,9 @@ export default function Onboarding() {
           })}
         </div>
 
-        {/* Card */}
+        {/* Card — no overflow-hidden so long steps can scroll naturally with the page */}
         <div
-          className="rounded-2xl overflow-hidden"
+          className="rounded-2xl"
           style={{
             background: 'rgba(13,17,23,0.95)',
             border: '1px solid rgba(99,102,241,0.2)',
@@ -565,16 +582,16 @@ export default function Onboarding() {
               {/* ── Step 4: LED config + interactive test ── */}
               {step === 4 && (
                 <div className="p-8 flex flex-col gap-5">
-                  <div>
-                    <h2 className="text-2xl font-bold text-white mb-1">LED-Konfiguration</h2>
-                    <p className="text-slate-400 text-sm">
-                      Wie viele LEDs sollen pro Fach leuchten?
-                      {wledConnected && (
-                        <span className="ml-2 inline-flex items-center gap-1 text-emerald-400 text-xs font-medium">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> WLED verbunden
-                        </span>
-                      )}
-                    </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h2 className="text-2xl font-bold text-white mb-1">LED-Konfiguration</h2>
+                      <p className="text-slate-400 text-sm">LEDs pro Fach und Strip-Verlegung einstellen.</p>
+                    </div>
+                    {wledConnected && (
+                      <span className="inline-flex items-center gap-1 text-emerald-400 text-xs font-medium whitespace-nowrap mt-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> WLED verbunden
+                      </span>
+                    )}
                   </div>
 
                   {/* LEDs per slot slider */}
@@ -593,226 +610,212 @@ export default function Onboarding() {
                     <div className="flex justify-between text-xs text-slate-600 mt-1"><span>1 LED</span><span>10 LEDs</span></div>
                   </div>
 
-                  {/* Optional: LED gap between slots */}
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => { setShowGapOption(!showGapOption); if (showGapOption) { setLedGap(0); setLitSlotIdx(null); } }}
-                      className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 transition-colors"
-                    >
-                      <motion.span
-                        animate={{ rotate: showGapOption ? 90 : 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="inline-block"
-                      >▶</motion.span>
-                      <span>Optionaler LED-Abstand zwischen Fächern</span>
-                      {ledGap > 0 && (
-                        <span className="ml-1 px-1.5 py-0.5 rounded text-xs font-mono" style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>
-                          {ledGap} LED{ledGap !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </button>
-
-                    {showGapOption && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mt-3 p-4 rounded-xl overflow-hidden"
-                        style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}
-                      >
-                        <p className="text-xs text-slate-400 mb-3">
-                          Manche Magazine haben Stege, hinter denen LEDs versteckt sind und nicht leuchten sollen.
-                          z.B. <span className="font-mono text-indigo-400">{ledsPerSlot} LEDs Fach → {ledGap} LED Abstand → {ledsPerSlot} LEDs Fach → ...</span>
-                        </p>
-                        <div className="flex justify-between items-center mb-2">
-                          <label className="text-sm font-medium text-slate-300">Abstand (inaktive LEDs)</label>
-                          <span className="text-xl font-bold font-mono" style={{ color: '#818cf8' }}>{ledGap}</span>
-                        </div>
-                        <input
-                          type="range" min={0} max={5} value={ledGap}
-                          onChange={(e) => { setLedGap(Number(e.target.value)); setLitSlotIdx(null); }}
-                          className="w-full accent-indigo-500"
-                        />
-                        <div className="flex justify-between text-xs text-slate-600 mt-1"><span>0 (kein Abstand)</span><span>5 LEDs</span></div>
-
-                        {/* Visual strip preview */}
-                        {ledGap > 0 && (
-                          <div className="mt-3 flex items-center gap-1 flex-wrap">
-                            <span className="text-xs text-slate-500 mr-1">Vorschau:</span>
-                            {Array.from({ length: Math.min(ledsPerSlot * 2 + ledGap, 20) }, (_, i) => {
-                              const posInCycle = i % (ledsPerSlot + ledGap);
-                              const isGapLed = posInCycle >= ledsPerSlot;
-                              return (
-                                <div
-                                  key={i}
-                                  className="w-3 h-3 rounded-full transition-colors"
-                                  style={isGapLed
-                                    ? { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }
-                                    : { background: '#06b6d4', boxShadow: '0 0 6px rgba(6,182,212,0.6)' }
-                                  }
-                                />
-                              );
-                            })}
-                            {(ledsPerSlot * 2 + ledGap) > 20 && <span className="text-xs text-slate-500">…</span>}
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
+                  {/* ── Stats + live validation row ── */}
+                  <div className="flex items-center gap-3">
+                    {[
+                      { label: 'LEDs/Reihe', value: String(rowPadding * 2 + columns * ledsPerSlot + Math.max(0, columns - 1) * ledGap), color: '#f59e0b' },
+                      { label: 'Fächer', value: String(calcSlots.length), color: '#6366f1' },
+                      { label: 'Ges. LEDs', value: String(totalLeds), color: '#06b6d4' },
+                    ].map((s) => (
+                      <div key={s.label} className="flex-1 text-center rounded-xl py-2.5 px-2"
+                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <p className="text-xl font-bold font-mono" style={{ color: s.color }}>{s.value}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+                      </div>
+                    ))}
                   </div>
 
-                  {/* Strip-LED-Count validation */}
+                  {/* Validation bar */}
                   {stripLedCount !== null && (() => {
-                    const needed = totalLeds;
-                    const have = stripLedCount;
-                    const ok = needed <= have;
-                    const exact = needed === have;
-                    const unused = have - needed;
+                    const exact = totalLeds === stripLedCount;
+                    const ok = totalLeds <= stripLedCount;
                     return (
-                      <div
-                        className="flex items-start gap-3 px-4 py-3 rounded-xl text-sm"
+                      <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm"
                         style={{
                           background: exact ? 'rgba(16,185,129,0.08)' : ok ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.1)',
                           border: exact ? '1px solid rgba(16,185,129,0.3)' : ok ? '1px solid rgba(245,158,11,0.25)' : '1px solid rgba(239,68,68,0.3)',
                         }}
                       >
-                        <span className={cn('flex-shrink-0 mt-0.5', exact ? 'text-emerald-400' : ok ? 'text-amber-400' : 'text-red-400')}>
-                          {exact ? '✓' : ok ? 'ⓘ' : '⚠'}
+                        <span className={exact ? 'text-emerald-400' : ok ? 'text-amber-400' : 'text-red-400'}>{exact ? '✓' : ok ? 'ⓘ' : '⚠'}</span>
+                        <span className="text-slate-300 text-xs">
+                          Magazin braucht <span className="font-mono text-cyan-400">{totalLeds}</span> · Strip hat <span className="font-mono text-cyan-400">{stripLedCount}</span>
+                          {exact && ' — perfekt!'}
+                          {!exact && ok && ` — ${stripLedCount - totalLeds} LEDs am Strip-Ende bleiben dunkel`}
+                          {!ok && ' — Konfiguration zu groß! LEDs/Fach oder Reihen verringern.'}
                         </span>
-                        <div className="flex-1">
-                          <p className="text-slate-200 font-medium">
-                            Magazin braucht <span className="font-mono text-cyan-400">{needed}</span> LEDs &nbsp;·&nbsp;
-                            Strip hat <span className="font-mono text-cyan-400">{have}</span> LEDs
-                          </p>
-                          <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                            {exact && 'Perfekt — jede LED wird genutzt.'}
-                            {!exact && ok && `${unused} LEDs am Ende des Strips bleiben dunkel — das ist OK.`}
-                            {!ok && `Konfiguration zu groß. Reduziere LEDs/Fach oder Reihen/Spalten — oder erweitere den Strip.`}
-                          </p>
-                        </div>
                       </div>
                     );
                   })()}
 
-                  {/* Stats */}
-                  <div className="grid grid-cols-3 gap-3">
-                    {[
-                      { label: ledGap > 0 ? `LEDs/Fach +${ledGap} Gap` : 'LEDs/Fach', value: ledGap > 0 ? `${ledsPerSlot}+${ledGap}` : ledsPerSlot, color: '#f59e0b' },
-                      { label: 'Fächer', value: calcSlots.length, color: '#6366f1' },
-                      { label: 'Verbrauchte LEDs', value: totalLeds, color: '#06b6d4' },
-                    ].map((stat) => (
-                      <div key={stat.label} className="text-center rounded-xl p-3"
-                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                        <p className="text-2xl font-bold font-mono" style={{ color: stat.color }}>{stat.value}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{stat.label}</p>
-                      </div>
-                    ))}
-                  </div>
+                  {/* ── Strip-Verlegung (origin + serpentine) ── */}
+                  <div className="rounded-xl p-4 flex flex-col gap-3"
+                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <p className="text-sm font-semibold text-slate-200">Strip-Verlegung</p>
 
-                  {/* Strip-Layout: Origin + Serpentine */}
-                  <div
-                    className="rounded-xl p-4 flex flex-col gap-4"
-                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-slate-200 mb-1">Strip-Verlegung</p>
-                      <p className="text-xs text-slate-500 leading-relaxed">
-                        Wo startet die <span className="text-cyan-400 font-mono">erste LED (Position 0)</span> physisch in deinem Magazin?
-                        Klicke unten auf "Test einzelne LED" um es zu prüfen.
-                      </p>
-                    </div>
-
-                    {/* Origin picker: 4 corners on a mini-magazine outline */}
-                    <div className="flex justify-center">
-                      <div
-                        className="relative"
-                        style={{
-                          width: 220,
-                          height: 140,
-                          background: 'rgba(255,255,255,0.03)',
-                          border: '2px dashed rgba(255,255,255,0.12)',
-                          borderRadius: 12,
-                        }}
-                      >
-                        <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-xs text-slate-600 select-none">
-                          Magazin
-                        </span>
+                    {/* Origin picker */}
+                    <div className="flex gap-4 items-center">
+                      <div className="relative flex-shrink-0"
+                        style={{ width: 140, height: 90, background: 'rgba(255,255,255,0.03)', border: '2px dashed rgba(255,255,255,0.12)', borderRadius: 10 }}>
+                        <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] text-slate-700 select-none">Magazin</span>
                         {([
-                          { id: 'top-left', cls: 'top-2 left-2' },
-                          { id: 'top-right', cls: 'top-2 right-2' },
-                          { id: 'bottom-left', cls: 'bottom-2 left-2' },
-                          { id: 'bottom-right', cls: 'bottom-2 right-2' },
+                          { id: 'top-left', cls: 'top-1.5 left-1.5' },
+                          { id: 'top-right', cls: 'top-1.5 right-1.5' },
+                          { id: 'bottom-left', cls: 'bottom-1.5 left-1.5' },
+                          { id: 'bottom-right', cls: 'bottom-1.5 right-1.5' },
                         ] as const).map((o) => {
                           const active = stripOrigin === o.id;
                           return (
-                            <button
-                              key={o.id}
-                              onClick={() => { setStripOrigin(o.id); setLitSlotIdx(null); }}
-                              className={cn('absolute w-7 h-7 rounded-full transition-all duration-200', o.cls)}
+                            <button key={o.id} onClick={() => { setStripOrigin(o.id); setLitSlotIdx(null); }}
+                              className={cn('absolute w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200', o.cls)}
                               style={{
                                 background: active ? '#06b6d4' : 'rgba(255,255,255,0.06)',
                                 border: active ? '2px solid #06b6d4' : '2px solid rgba(255,255,255,0.12)',
-                                boxShadow: active ? '0 0 16px rgba(6,182,212,0.6)' : 'none',
-                                cursor: 'pointer',
-                              }}
-                              title={`LED 0 startet ${o.id === 'top-left' ? 'oben links' : o.id === 'top-right' ? 'oben rechts' : o.id === 'bottom-left' ? 'unten links' : 'unten rechts'}`}
-                            >
-                              {active && <span className="text-[10px] font-bold text-white">0</span>}
+                                boxShadow: active ? '0 0 12px rgba(6,182,212,0.5)' : 'none',
+                              }}>
+                              {active && <span className="text-[9px] font-bold text-white leading-none">0</span>}
                             </button>
                           );
                         })}
                       </div>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs text-slate-500">
-                        LED 0 startet:{' '}
-                        <span className="text-cyan-400 font-medium">
-                          {stripOrigin === 'top-left' && 'oben links'}
-                          {stripOrigin === 'top-right' && 'oben rechts'}
-                          {stripOrigin === 'bottom-left' && 'unten links'}
-                          {stripOrigin === 'bottom-right' && 'unten rechts'}
-                        </span>
-                      </p>
-                      {wledConnected && (
-                        <button
-                          onClick={handleTestLed0}
-                          className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                          style={{
-                            background: 'rgba(255,128,0,0.1)',
-                            border: '1px solid rgba(255,128,0,0.3)',
-                            color: '#fb923c',
-                          }}
-                        >
-                          🔍 LED 0 leuchten lassen
-                        </button>
-                      )}
+                      <div className="flex-1 flex flex-col gap-2">
+                        <p className="text-xs text-slate-400 leading-snug">
+                          Wähle die Ecke wo <span className="text-cyan-400">LED&nbsp;0</span> physisch sitzt.
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Gewählt: <span className="text-cyan-400">
+                            {stripOrigin === 'top-left' && 'oben links'}
+                            {stripOrigin === 'top-right' && 'oben rechts'}
+                            {stripOrigin === 'bottom-left' && 'unten links'}
+                            {stripOrigin === 'bottom-right' && 'unten rechts'}
+                          </span>
+                        </p>
+                        {wledConnected && (
+                          <button onClick={handleTestLed0}
+                            className="self-start px-2.5 py-1 rounded-lg text-xs font-semibold transition-all"
+                            style={{ background: 'rgba(255,128,0,0.1)', border: '1px solid rgba(255,128,0,0.3)', color: '#fb923c' }}>
+                            🔍 LED 0 leuchten
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Serpentine toggle */}
-                    <div
-                      className="flex items-start gap-3 px-3 py-2.5 rounded-lg cursor-pointer select-none transition-all"
-                      style={{ background: serpentine ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: serpentine ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.06)' }}
-                      onClick={() => { setSerpentine(!serpentine); setLitSlotIdx(null); }}
-                    >
-                      <div
-                        className="mt-0.5 w-10 h-5 rounded-full flex-shrink-0 transition-colors duration-200 relative"
-                        style={{ background: serpentine ? '#6366f1' : 'rgba(255,255,255,0.12)' }}
-                      >
-                        <div
-                          className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200"
-                          style={{ transform: serpentine ? 'translateX(22px)' : 'translateX(2px)' }}
-                        />
+                    <div className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer select-none transition-all"
+                      style={{ background: serpentine ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.02)', border: serpentine ? '1px solid rgba(99,102,241,0.35)' : '1px solid rgba(255,255,255,0.06)' }}
+                      onClick={() => { setSerpentine(!serpentine); setLitSlotIdx(null); }}>
+                      <div className="w-9 h-5 rounded-full flex-shrink-0 relative transition-colors duration-200"
+                        style={{ background: serpentine ? '#6366f1' : 'rgba(255,255,255,0.12)' }}>
+                        <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200"
+                          style={{ transform: serpentine ? 'translateX(20px)' : 'translateX(2px)' }} />
                       </div>
-                      <div className="flex-1">
+                      <div>
                         <p className="text-sm font-medium text-slate-200">Schlangenmuster (Serpentine)</p>
-                        <p className="text-xs text-slate-500 mt-0.5 leading-snug">
-                          {serpentine
-                            ? 'Reihen wechseln Richtung: →, ←, →, ← …'
-                            : 'Alle Reihen laufen in dieselbe Richtung (Strip macht „Sprünge").'}
-                        </p>
+                        <p className="text-xs text-slate-500">{serpentine ? '→ ← → ← (Reihen wechseln Richtung)' : 'Alle Reihen gleiche Richtung'}</p>
                       </div>
                     </div>
+                  </div>
+
+                  {/* ── Erweiterte Optionen (gap + skip + large row) ── */}
+                  <div>
+                    <button type="button"
+                      onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                      className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 transition-colors">
+                      <motion.span animate={{ rotate: showAdvancedOptions ? 90 : 0 }} transition={{ duration: 0.2 }} className="inline-block text-xs">▶</motion.span>
+                      <span>Erweiterte Optionen</span>
+                      {(ledGap > 0 || rowPadding > 0 || ledSkipFirst > 0 || largeRowLeds > 0) && (
+                        <span className="px-1.5 py-0.5 rounded text-xs font-mono" style={{ background: 'rgba(99,102,241,0.2)', color: '#818cf8' }}>aktiv</span>
+                      )}
+                    </button>
+
+                    {showAdvancedOptions && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+                        className="mt-3 rounded-xl flex flex-col divide-y overflow-hidden"
+                        style={{ border: '1px solid rgba(99,102,241,0.2)' }}>
+
+                        {/* Row padding */}
+                        <div className="p-4 flex flex-col gap-2">
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-slate-300">Reihen-Randabstand</label>
+                            <span className="text-base font-bold font-mono text-indigo-400">{rowPadding} LED{rowPadding !== 1 ? 's' : ''}</span>
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            LEDs an beiden Enden jeder physischen Reihe überspringen.
+                            {rowPadding > 0 && <> Reihe: <span className="font-mono text-indigo-400">{rowPadding}+{columns}×{ledsPerSlot}+{rowPadding} = {rowPadding * 2 + columns * ledsPerSlot + Math.max(0, columns - 1) * ledGap} LEDs</span></>}
+                          </p>
+                          <input type="range" min={0} max={5} value={rowPadding}
+                            onChange={(e) => { setRowPadding(Number(e.target.value)); setLitSlotIdx(null); }}
+                            className="w-full accent-indigo-500" />
+                          {rowPadding > 0 && (
+                            <div className="flex items-center gap-0.5 flex-wrap">
+                              {(() => {
+                                const total = rowPadding * 2 + columns * ledsPerSlot + Math.max(0, columns - 1) * ledGap;
+                                return Array.from({ length: Math.min(total, 30) }, (_, i) => {
+                                  const isPad = i < rowPadding || i >= total - rowPadding;
+                                  return <div key={i} className="w-2.5 h-2.5 rounded-full"
+                                    style={isPad
+                                      ? { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }
+                                      : { background: '#06b6d4', boxShadow: '0 0 5px rgba(6,182,212,0.5)' }} />;
+                                });
+                              })()}
+                              {(rowPadding * 2 + columns * ledsPerSlot + Math.max(0, columns - 1) * ledGap) > 30 && <span className="text-xs text-slate-600 ml-1">…</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Gap between slots */}
+                        <div className="p-4 flex flex-col gap-2">
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-slate-300">Abstand zwischen Fächern</label>
+                            <span className="text-base font-bold font-mono text-indigo-400">{ledGap} LED{ledGap !== 1 ? 's' : ''}</span>
+                          </div>
+                          <p className="text-xs text-slate-500">LEDs hinter Stegen, die nicht leuchten sollen. z.B. <span className="font-mono text-indigo-400">{ledsPerSlot}+{ledGap}+{ledsPerSlot}+{ledGap}…</span></p>
+                          <input type="range" min={0} max={8} value={ledGap}
+                            onChange={(e) => { setLedGap(Number(e.target.value)); setLitSlotIdx(null); }}
+                            className="w-full accent-indigo-500" />
+                          {ledGap > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {Array.from({ length: Math.min((ledsPerSlot + ledGap) * 2, 24) }, (_, i) => {
+                                const inCycle = i % (ledsPerSlot + ledGap);
+                                return <div key={i} className="w-2.5 h-2.5 rounded-full"
+                                  style={inCycle >= ledsPerSlot
+                                    ? { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }
+                                    : { background: '#06b6d4', boxShadow: '0 0 5px rgba(6,182,212,0.5)' }} />;
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Skip first */}
+                        <div className="p-4 flex flex-col gap-2">
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-slate-300">LEDs am Strip-Anfang überspringen</label>
+                            <span className="text-base font-bold font-mono text-indigo-400">{ledSkipFirst}</span>
+                          </div>
+                          <p className="text-xs text-slate-500">Tote LEDs / Zuleitung vor dem ersten Fach. Klick auf "LED 0 leuchten" zum Prüfen.</p>
+                          <input type="range" min={0} max={50} value={ledSkipFirst}
+                            onChange={(e) => { setLedSkipFirst(Number(e.target.value)); setLitSlotIdx(null); }}
+                            className="w-full accent-indigo-500" />
+                        </div>
+
+                        {/* Large row override */}
+                        {bottomRowLarge && (
+                          <div className="p-4 flex flex-col gap-2">
+                            <div className="flex justify-between items-center">
+                              <label className="text-sm font-medium text-slate-300">LEDs im großen Fach (unten)</label>
+                              <span className="text-base font-bold font-mono text-indigo-400">
+                                {largeRowLeds === 0
+                                  ? `= ${columns * ledsPerSlot + Math.max(0, columns - 1) * ledGap} (auto)`
+                                  : largeRowLeds}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500">0 = gleich wie eine normale Reihe. Eingabe falls das große Fach mehr LEDs hat.</p>
+                            <input type="number" min={0} max={500} value={largeRowLeds}
+                              onChange={(e) => { const v = parseInt(e.target.value, 10); setLargeRowLeds(isNaN(v) ? 0 : Math.max(0, Math.min(500, v))); setLitSlotIdx(null); }}
+                              className="input-dark w-full px-3 py-2 text-sm font-mono" placeholder="0 = automatisch" />
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
                   </div>
 
                   {/* Interactive test grid — only if WLED connected */}

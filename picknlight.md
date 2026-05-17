@@ -41,7 +41,12 @@ docker compose up -d
 | `rows` | INT | Anzahl Reihen |
 | `columns` | INT | Anzahl Spalten |
 | `leds_per_slot` | INT | LEDs pro Fach (Standard: 3) |
-| `led_gap`       | INT | Inaktive LEDs zwischen Fächern als Abstand (Standard: 0) |
+| `led_gap` | INT | Inaktive LEDs zwischen Fächern (Standard: 0) |
+| `row_padding` | INT | LEDs an BEIDEN Enden jeder physischen Reihe überspringen (Standard: 0). Beispiel: `row_padding=1, cols=4, leds=4` → `[1 skip][4][4][4][4][1 skip]` = 18 LEDs/Reihe |
+| `led_skip_first` | INT | Globaler Offset vor der ersten Reihe – tote LEDs am Strip-Anfang (Standard: 0) |
+| `serpentine` | BOOL | LED-Strip läuft Zickzack: gerade Reihen →, ungerade Reihen ← |
+| `strip_origin` | TEXT | Ecke wo LED 0 liegt: `top-left` / `top-right` / `bottom-left` / `bottom-right` |
+| `large_row_leds` | INT | Override LED-Anzahl für das große untere Fach (0 = wie normale Reihe) |
 | `bottom_row_large` | BOOL | Unterste Reihe = ein großes Fach |
 | `created_at` | TIMESTAMP | Erstellt |
 | `updated_at` | TIMESTAMP | Geändert |
@@ -97,15 +102,37 @@ docker compose up -d
 
 ## API-Referenz
 
+### Tags
+```
+GET    /api/tags                        Alle einzigartigen Tags aus allen Teilen (global)
+```
+
+Tags werden nicht separat gespeichert – sie werden aus den `tags`-Arrays aller `parts` aggregiert und alphabetisch sortiert zurückgegeben. Das Frontend nutzt diesen Endpunkt für die Autocomplete-Vorschläge im Teile-Formular.
+
 ### Magazines
 ```
 GET    /api/magazines                   Alle Magazine
 POST   /api/magazines                   Magazin erstellen (Slots werden auto-berechnet)
 GET    /api/magazines/:id               Magazin mit Slots + Parts
-PUT    /api/magazines/:id               Magazin aktualisieren
+PUT    /api/magazines/:id               Magazin aktualisieren (LED-Params → Slots werden neu berechnet)
 DELETE /api/magazines/:id               Magazin löschen
 POST   /api/magazines/:id/duplicate     Magazin duplizieren (ohne Parts)
 ```
+
+**POST/PUT Body-Parameter (magazines):**
+| Feld | Typ | Beschreibung |
+|---|---|---|
+| `name` | string | Magazin-Name |
+| `rows` | int | Anzahl Reihen |
+| `columns` | int | Anzahl Spalten |
+| `ledsPerSlot` | int | LEDs pro Fach |
+| `ledGap` | int | Abstand-LEDs zwischen Fächern |
+| `rowPadding` | int | Skip-LEDs an beiden Reihen-Enden |
+| `ledSkipFirst` | int | Globaler Strip-Offset am Anfang |
+| `serpentine` | bool | Zickzack-Verlegung |
+| `stripOrigin` | string | `top-left` / `top-right` / `bottom-left` / `bottom-right` |
+| `bottomRowLarge` | bool | Unterste Reihe = Großfach |
+| `largeRowLeds` | int | Override LED-Anzahl Großfach (0 = auto) |
 
 ### Parts
 ```
@@ -124,12 +151,22 @@ DELETE /api/search/highlight            Alle LEDs ausschalten
 
 ### WLED Devices
 ```
-GET    /api/wled/devices                Alle WLED-Geräte
-POST   /api/wled/devices                Gerät hinzufügen
-PUT    /api/wled/devices/:id            Gerät bearbeiten
-DELETE /api/wled/devices/:id            Gerät löschen
-POST   /api/wled/devices/:id/test       LED-Test (alle Fächer nacheinander)
+GET    /api/wled/status                         MQTT-Status
+GET    /api/wled/devices                        Alle WLED-Geräte
+POST   /api/wled/devices                        Gerät hinzufügen
+PUT    /api/wled/devices/:id                    Gerät bearbeiten
+DELETE /api/wled/devices/:id                    Gerät löschen
+POST   /api/wled/devices/:id/test               LED-Test (flash / sequence)
+POST   /api/wled/devices/:id/light-range        LED-Bereich leuchten
+POST   /api/wled/devices/:id/all-off            Alle LEDs aus
 ```
+
+**POST /api/wled/devices/:id/test Body:**
+```json
+{ "mode": "flash|sequence", "delayMs": 600, "totalLedsOverride": 162, "slotOverrides": [...] }
+```
+`totalLedsOverride` und `slotOverrides` erlauben das Frontend, aktuelle (noch nicht gespeicherte)
+Konfigurationswerte zu übermitteln, sodass der Test immer den aktuellen UI-Stand reflektiert.
 
 ### Voice Webhook (Alexa, Home Assistant, IFTTT)
 ```
@@ -145,21 +182,36 @@ PUT    /api/settings                    Einstellungen speichern
 
 ## WLED MQTT Kommunikation
 
-WLED lauscht nativ auf `{mqtt_topic}/api`. Payload ist der WLED JSON State:
+WLED lauscht nativ auf `{mqtt_topic}/api`. Payload ist der WLED JSON State.
 
-**Slot aufleuchten (amber):**
+**Wichtig:** Für alle "voller Strip"-Befehle wird `stop: 9999` als Sentinel verwendet.
+WLED clippt diesen Wert automatisch auf seine konfigurierte Strip-Länge (`info.leds.count`).
+Das macht den Code unabhängig von der exakten LED-Anzahl für Hintergrund-Segmente.
+
+**Slot aufleuchten (zwei Segmente):**
 ```json
-{"seg":[{"id":0,"start":5,"stop":8,"col":[[255,165,0],0,0],"on":true,"bri":255}]}
+{
+  "on": true, "bri": 255,
+  "seg": [
+    {"id": 0, "start": 0, "stop": 9999, "col": [[0,0,0],[0,0,0],[0,0,0]], "fx": 0, "on": true},
+    {"id": 1, "start": 5, "stop": 9,    "col": [[255,165,0],[0,0,0],[0,0,0]], "fx": 0, "on": true}
+  ]
+}
 ```
 
-**Alles rot blinken (nicht gefunden):**
+**Alle LEDs ein (flash):**
 ```json
-{"v":true,"seg":[{"start":0,"stop":100,"col":[[255,0,0]],"fx":1,"ix":200,"on":true}]}
+{"on": true, "bri": 255, "seg": [{"id": 0, "start": 0, "stop": 9999, "col": [[0,200,255],[0,0,0],[0,0,0]], "fx": 0, "on": true}, {"id": 1, "start": 0, "stop": 0}]}
 ```
 
-**LED ausschalten:**
+**Alles aus:**
 ```json
-{"seg":[{"id":0,"start":5,"stop":8,"on":false}]}
+{"on": false}
+```
+
+**Alle rot blinken (nicht gefunden):**
+```json
+{"on": true, "bri": 255, "seg": [{"id": 0, "start": 0, "stop": 9999, "col": [[255,0,0],[0,0,0],[0,0,0]], "fx": 1, "ix": 220, "on": true}, {"id": 1, "start": 0, "stop": 0}]}
 ```
 
 ## Voice Integration
@@ -178,11 +230,37 @@ rest_command:
     payload: '{"query": "{{ query }}"}'
 ```
 
+## LED-Berechnung
+
+```
+Reihe = [row_padding] [slot×leds_per_slot + (cols-1)×led_gap] [row_padding]
+Gesamt = led_skip_first + (rows-1) × ledsPerRow + largeRowTotal
+```
+
+Beispiel (9 Reihen, 4 Spalten, ledsPerSlot=4, rowPadding=1, ledGap=0):
+```
+ledsPerRow = 1 + 4×4 + 0 + 1 = 18
+total      = 0 + 8×18 + 18 = 162
+```
+
 ## Migrations
 
-### Migration 001 – Initial Schema (auto via Prisma)
-Erstellt: magazines, slots, parts, wled_devices, settings
+| Migration | Inhalt |
+|---|---|
+| `001_initial` | Erstellt: magazines, slots, parts, wled_devices, settings |
+| `002_add_led_gap` | `led_gap` Spalte in magazines |
+| `003_add_serpentine` | `serpentine` Spalte in magazines |
+| `004_add_strip_origin` | `strip_origin` Spalte in magazines |
+| `005_skip_first_and_large_row` | `led_skip_first`, `large_row_leds` Spalten in magazines |
+| `006_add_row_padding` | `row_padding` Spalte in magazines |
 
 ## Changelog
 
 - **2026-05-17** – Initiales Setup, vollständige Implementierung
+- **2026-05-17** – LED-Konfig erweitert: ledGap, serpentine, stripOrigin, ledSkipFirst, largeRowLeds, rowPadding
+- **2026-05-17** – FULL_STRIP Sentinel (stop: 9999) für robuste WLED-Segment-Kontrolle
+- **2026-05-17** – Onboarding: totalLedsOverride für Live-Tests vor dem Speichern
+- **2026-05-17** – Globale Tags: `GET /api/tags` aggregiert alle eindeutigen Tags; Tag-Autocomplete im Teile-Formular
+- **2026-05-17** – Wandansicht (Wall View): Dashboard zeigt alle Magazine nebeneinander (1/2/3 Spalten, persistent im LocalStorage)
+- **2026-05-17** – Magazin-Grid: verbesserte SlotCell-Optik (Reihe·Spalte-Badge, Tag-Dots, Akzentlinie), `compact`-Modus für Wandansicht
+- **2026-05-17** – Responsive Design: Bottom-Navigation auf Mobilgeräten (< sm), bottom-sheet-Modal, safe-area-Unterstützung
