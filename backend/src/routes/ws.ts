@@ -1,5 +1,4 @@
-import { FastifyPluginAsync } from 'fastify';
-import { FastifyInstance } from 'fastify';
+import { FastifyPluginAsync, FastifyInstance } from 'fastify';
 import websocket from '@fastify/websocket';
 import { wledEvents, LedStateEvent, getMqttStatus } from '../services/wled';
 
