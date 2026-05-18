@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useActionState, useTransition } from 'react';
 import { motion } from 'framer-motion';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { X, Save, Trash2, AlertTriangle, Package, Zap, Tag } from 'lucide-react';
+import { X, Save, Trash2, AlertTriangle, Package, Zap, Tag, QrCode } from 'lucide-react';
 import type { Slot, Magazine } from '@/lib/types';
 import { api } from '@/lib/api';
 import { cn, isLowStock, formatQuantity } from '@/lib/utils';
@@ -26,8 +26,8 @@ export default function SlotModal({ slot, magazine, onClose, onSaved }: SlotModa
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>(slot.part?.tags ?? []);
   const [showTagDropdown, setShowTagDropdown] = useState(false);
-  const [error, setError] = useState('');
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const [deleteTransitionPending, startDeleteTransition] = useTransition();
 
   const commonUnits = ['Stk', 'g', 'kg', 'mm', 'cm', 'm', 'ml', 'l', 'Pck', 'Rolle'];
 
@@ -41,53 +41,50 @@ export default function SlotModal({ slot, magazine, onClose, onSaved }: SlotModa
     (t) => t.includes(tagInput.toLowerCase().trim()) && !tags.includes(t)
   );
 
-  const createPart = useMutation({
-    mutationFn: () =>
-      api.parts.create({
-        slotId: slot.id,
-        name,
-        description: description || undefined,
-        quantity: parseFloat(quantity) || 0,
-        unit,
-        minQuantity: minQuantity ? parseFloat(minQuantity) : null,
-        tags,
-      }),
-    onSuccess: onSaved,
-    onError: (e: Error) => setError(e.message),
-  });
-
-  const updatePart = useMutation({
-    mutationFn: () =>
-      api.parts.update(slot.part!.id, {
-        name,
-        description: description || undefined,
-        quantity: parseFloat(quantity) || 0,
-        unit,
-        minQuantity: minQuantity ? parseFloat(minQuantity) : null,
-        tags,
-      }),
-    onSuccess: onSaved,
-    onError: (e: Error) => setError(e.message),
-  });
+  // React 19: useActionState replaces manual isPending + error state + useMutation for save
+  const [formState, submitAction, isSaving] = useActionState(
+    async (_prev: { error: string }) => {
+      if (!name.trim()) return { error: 'Bitte einen Artikelnamen eingeben.' };
+      try {
+        const data = {
+          name,
+          description: description || undefined,
+          quantity: parseFloat(quantity) || 0,
+          unit,
+          minQuantity: minQuantity ? parseFloat(minQuantity) : null,
+          tags,
+        };
+        if (isNew) {
+          await api.parts.create({ slotId: slot.id, ...data });
+        } else {
+          await api.parts.update(slot.part!.id, data);
+        }
+        onSaved();
+        return { error: '' };
+      } catch (e) {
+        return { error: (e as Error).message };
+      }
+    },
+    { error: '' }
+  );
 
   const deletePart = useMutation({
     mutationFn: () => api.parts.delete(slot.part!.id),
     onSuccess: onSaved,
-    onError: (e: Error) => setError(e.message),
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    if (!name.trim()) {
-      setError('Bitte einen Artikelnamen eingeben.');
-      return;
-    }
-    if (isNew) {
-      createPart.mutate();
-    } else {
-      updatePart.mutate();
-    }
+  const handlePrintQr = async () => {
+    const QRCode = await import('qrcode');
+    const label = name || 'Unbekannt';
+    const dataUrl = await QRCode.toDataURL(label, { width: 256, margin: 1, color: { dark: '#000', light: '#fff' } });
+    const win = window.open('', '_blank', 'width=400,height=500');
+    if (!win) return;
+    const pos = slot.isLarge ? `Großfach` : `R${slot.row + 1} / S${slot.col + 1}`;
+    win.document.write(`<!DOCTYPE html><html><head><title>QR Label</title>
+      <style>body{font-family:sans-serif;text-align:center;padding:20px;background:#fff;color:#000}
+      img{display:block;margin:0 auto 8px}p{margin:4px 0;font-size:13px}strong{font-size:16px}</style></head>
+      <body><img src="${dataUrl}" width="200" /><strong>${label}</strong><p>${pos}</p>
+      <script>window.print();window.close();<\/script></body></html>`);
   };
 
   const handleAddTag = (value?: string) => {
@@ -98,8 +95,6 @@ export default function SlotModal({ slot, magazine, onClose, onSaved }: SlotModa
     setTagInput('');
     setShowTagDropdown(false);
   };
-
-  const isSaving = createPart.isPending || updatePart.isPending;
   const lowStock = slot.part
     ? isLowStock({ quantity: parseFloat(quantity) || 0, minQuantity: minQuantity ? parseFloat(minQuantity) : null })
     : false;
@@ -175,7 +170,7 @@ export default function SlotModal({ slot, magazine, onClose, onSaved }: SlotModa
         </div>
 
         {/* Form (scrollable) */}
-        <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4 overflow-y-auto">
+        <form action={submitAction} className="p-5 flex flex-col gap-4 overflow-y-auto">
           {/* Name */}
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-1.5">
@@ -398,24 +393,34 @@ export default function SlotModal({ slot, magazine, onClose, onSaved }: SlotModa
             </div>
           )}
 
-          {error && (
+          {formState.error && (
             <p className="text-sm text-red-400 flex items-center gap-1.5">
-              <AlertTriangle className="w-4 h-4" /> {error}
+              <AlertTriangle className="w-4 h-4" /> {formState.error}
             </p>
           )}
 
           {/* Actions */}
           <div className="flex justify-between items-center pt-2 pb-1">
             {!isNew ? (
-              <button
-                type="button"
-                onClick={() => deletePart.mutate()}
-                disabled={deletePart.isPending}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all border border-transparent hover:border-red-500/20"
-              >
-                <Trash2 className="w-4 h-4" />
-                Löschen
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => startDeleteTransition(() => { deletePart.mutate(); })}
+                  disabled={deleteTransitionPending || deletePart.isPending}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all border border-transparent hover:border-red-500/20"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Löschen
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrintQr}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-all"
+                  title="QR-Label drucken"
+                >
+                  <QrCode className="w-4 h-4" />
+                </button>
+              </div>
             ) : (
               <div />
             )}

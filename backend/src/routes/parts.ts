@@ -1,99 +1,99 @@
-import { Router, Request, Response } from 'express';
+import { FastifyPluginAsync } from 'fastify';
 import prisma from '../db';
 
-const router = Router();
+const plugin: FastifyPluginAsync = async (fastify) => {
+  fastify.post('/', { schema: { tags: ['parts'] } }, async (request, reply) => {
+    try {
+      const { slotId, name, description, quantity, unit, minQuantity, tags } =
+        request.body as {
+          slotId: number; name: string; description?: string;
+          quantity?: number; unit?: string; minQuantity?: number | null; tags?: string[];
+        };
 
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const { slotId, name, description, quantity, unit, minQuantity, tags } = req.body;
+      if (!slotId || !name) {
+        reply.code(400);
+        return { error: 'slotId and name are required' };
+      }
 
-    if (!slotId || !name) {
-      res.status(400).json({ error: 'slotId and name are required' });
-      return;
+      const slot = await prisma.slot.findUnique({ where: { id: slotId } });
+      if (!slot) { reply.code(404); return { error: 'Slot not found' }; }
+
+      const existing = await prisma.part.findUnique({ where: { slotId } });
+      if (existing) { reply.code(409); return { error: 'Slot already has a part. Use PUT to update.' }; }
+
+      const part = await prisma.part.create({
+        data: {
+          slotId, name,
+          description: description || null,
+          quantity: quantity ?? 0,
+          unit: unit || 'Stk',
+          minQuantity: minQuantity ?? null,
+          tags: tags || [],
+        },
+        include: { slot: true },
+      });
+
+      reply.code(201);
+      return part;
+    } catch {
+      reply.code(500);
+      return { error: 'Failed to create part' };
     }
+  });
 
-    const slot = await prisma.slot.findUnique({ where: { id: slotId } });
-    if (!slot) {
-      res.status(404).json({ error: 'Slot not found' });
-      return;
+  fastify.get<{ Params: { id: string } }>('/:id', { schema: { tags: ['parts'] } }, async (request, reply) => {
+    try {
+      const id = parseInt(request.params.id);
+      const part = await prisma.part.findUnique({
+        where: { id },
+        include: { slot: { include: { magazine: true } } },
+      });
+      if (!part) { reply.code(404); return { error: 'Part not found' }; }
+      return part;
+    } catch {
+      reply.code(500);
+      return { error: 'Failed to fetch part' };
     }
+  });
 
-    const existing = await prisma.part.findUnique({ where: { slotId } });
-    if (existing) {
-      res.status(409).json({ error: 'Slot already has a part. Use PUT to update.' });
-      return;
+  fastify.put<{ Params: { id: string } }>('/:id', { schema: { tags: ['parts'] } }, async (request, reply) => {
+    try {
+      const id = parseInt(request.params.id);
+      const { name, description, quantity, unit, minQuantity, tags } =
+        request.body as {
+          name?: string; description?: string; quantity?: number;
+          unit?: string; minQuantity?: number | null; tags?: string[];
+        };
+
+      const part = await prisma.part.update({
+        where: { id },
+        data: {
+          ...(name !== undefined && { name }),
+          ...(description !== undefined && { description }),
+          ...(quantity !== undefined && { quantity }),
+          ...(unit !== undefined && { unit }),
+          ...(minQuantity !== undefined && { minQuantity }),
+          ...(tags !== undefined && { tags }),
+        },
+        include: { slot: { include: { magazine: true } } },
+      });
+      return part;
+    } catch {
+      reply.code(500);
+      return { error: 'Failed to update part' };
     }
+  });
 
-    const part = await prisma.part.create({
-      data: {
-        slotId,
-        name,
-        description: description || null,
-        quantity: quantity ?? 0,
-        unit: unit || 'Stk',
-        minQuantity: minQuantity ?? null,
-        tags: tags || [],
-      },
-      include: { slot: true },
-    });
-
-    res.status(201).json(part);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to create part' });
-  }
-});
-
-router.get('/:id', async (req: Request, res: Response) => {
-  try {
-    const id = parseInt(req.params.id as string);
-    const part = await prisma.part.findUnique({
-      where: { id },
-      include: { slot: { include: { magazine: true } } },
-    });
-
-    if (!part) {
-      res.status(404).json({ error: 'Part not found' });
-      return;
+  fastify.delete<{ Params: { id: string } }>('/:id', { schema: { tags: ['parts'] } }, async (request, reply) => {
+    try {
+      const id = parseInt(request.params.id);
+      await prisma.part.delete({ where: { id } });
+      return { success: true };
+    } catch {
+      reply.code(500);
+      return { error: 'Failed to delete part' };
     }
+  });
+};
 
-    res.json(part);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch part' });
-  }
-});
-
-router.put('/:id', async (req: Request, res: Response) => {
-  try {
-    const id = parseInt(req.params.id as string);
-    const { name, description, quantity, unit, minQuantity, tags } = req.body;
-
-    const part = await prisma.part.update({
-      where: { id },
-      data: {
-        ...(name !== undefined && { name }),
-        ...(description !== undefined && { description }),
-        ...(quantity !== undefined && { quantity }),
-        ...(unit !== undefined && { unit }),
-        ...(minQuantity !== undefined && { minQuantity }),
-        ...(tags !== undefined && { tags }),
-      },
-      include: { slot: { include: { magazine: true } } },
-    });
-
-    res.json(part);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update part' });
-  }
-});
-
-router.delete('/:id', async (req: Request, res: Response) => {
-  try {
-    const id = parseInt(req.params.id as string);
-    await prisma.part.delete({ where: { id } });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete part' });
-  }
-});
-
-export default router;
+export default plugin;

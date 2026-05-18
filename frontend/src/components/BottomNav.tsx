@@ -35,7 +35,7 @@ export default function BottomNav() {
                 <div
                   className={cn(
                     'w-10 h-8 flex items-center justify-center rounded-xl transition-all',
-                    isActive ? 'bg-accent-DEFAULT/20' : ''
+                    isActive ? 'bg-accent/20' : ''
                   )}
                 >
                   <Icon className="w-5 h-5" />

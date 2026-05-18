@@ -1,17 +1,17 @@
-import { Router, Request, Response } from 'express';
+import { FastifyPluginAsync } from 'fastify';
 import prisma from '../db';
 
-const router = Router();
+const plugin: FastifyPluginAsync = async (fastify) => {
+  fastify.get('/', { schema: { tags: ['tags'] } }, async (_request, reply) => {
+    try {
+      const parts = await prisma.part.findMany({ select: { tags: true } });
+      const allTags = [...new Set(parts.flatMap((p) => p.tags))].sort();
+      return allTags;
+    } catch {
+      reply.code(500);
+      return { error: 'Failed to fetch tags' };
+    }
+  });
+};
 
-// GET /api/tags - returns all unique tags across all parts, sorted alphabetically
-router.get('/', async (_req: Request, res: Response) => {
-  try {
-    const parts = await prisma.part.findMany({ select: { tags: true } });
-    const allTags = [...new Set(parts.flatMap((p) => p.tags))].sort();
-    res.json(allTags);
-  } catch {
-    res.status(500).json({ error: 'Failed to fetch tags' });
-  }
-});
-
-export default router;
+export default plugin;

@@ -1,47 +1,94 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
 
+@theme {
+  /* ─── Custom colors ─────────────────────────────────────────────────── */
+  --color-dark-50:  #f8fafc;
+  --color-dark-900: #07090f;
+  --color-dark-800: #0d1117;
+  --color-dark-700: #111827;
+  --color-dark-600: #1a2235;
+  --color-dark-500: #243044;
+
+  --color-accent:       #6366f1;
+  --color-accent-light: #818cf8;
+  --color-accent-dark:  #4f46e5;
+  --color-accent-glow:  rgba(99,102,241,0.35);
+
+  --color-led-on:       #f59e0b;
+  --color-led-on-glow:  rgba(245,158,11,0.5);
+  --color-led-off:      #1e293b;
+  --color-led-red:      #ef4444;
+  --color-led-red-glow: rgba(239,68,68,0.5);
+  --color-led-cyan:     #06b6d4;
+  --color-led-cyan-glow: rgba(6,182,212,0.5);
+  --color-led-low:      #f97316;
+
+  /* ─── Custom backdrop blur ──────────────────────────────────────────── */
+  --blur-xs: 2px;
+
+  /* ─── Custom animations ─────────────────────────────────────────────── */
+  --animate-led-pulse: led-pulse 1.4s ease-in-out infinite;
+  --animate-led-blink: led-blink 0.4s ease-in-out 6;
+  --animate-fade-in:   fade-in 0.3s ease-out;
+  --animate-slide-up:  slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-glow-ring: glow-ring 2s ease-in-out infinite;
+  --animate-float:     float 3s ease-in-out infinite;
+
+  @keyframes led-pulse {
+    0%, 100% { box-shadow: 0 0 8px 2px rgba(245,158,11,0.4), 0 0 20px 4px rgba(245,158,11,0.2); }
+    50%       { box-shadow: 0 0 16px 4px rgba(245,158,11,0.7), 0 0 40px 8px rgba(245,158,11,0.35); }
+  }
+  @keyframes led-blink {
+    0%, 100% { background-color: rgba(239,68,68,0.12); box-shadow: none; border-color: rgba(239,68,68,0.3); }
+    50%       { background-color: rgba(239,68,68,0.55); box-shadow: 0 0 20px 4px rgba(239,68,68,0.45); border-color: #ef4444; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes glow-ring {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(99,102,241,0.3); }
+    50%       { box-shadow: 0 0 0 3px rgba(99,102,241,0.6), 0 0 20px rgba(99,102,241,0.2); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-6px); }
+  }
+}
+
+/* ─── Design tokens (kept as CSS variables for inline-style usage) ─────── */
 :root {
-  /* ─── Background elevation scale ─────────────────────────────────────────
-     Level 0 → app bg  (darkest, not pure black → avoids halation)
-     Level 1 → sidebar / top bars
-     Level 2 → cards / surfaces
-     Level 3 → elevated cards / modals
-     Level 4 → inputs                                                        */
-  --bg-0: #0d1117;   /* GitHub dark — well-tested baseline */
-  --bg-1: #111827;   /* sidebar / nav / top bars */
-  --bg-2: #161c2c;   /* cards / stat panels */
-  --bg-3: #1c2333;   /* modal dialogs */
-  --bg-4: #0f1521;   /* input fields */
+  --bg-0: #0d1117;
+  --bg-1: #111827;
+  --bg-2: #161c2c;
+  --bg-3: #1c2333;
+  --bg-4: #0f1521;
 
-  /* legacy aliases (kept for any remaining uses) */
-  --bg-primary: #0d1117;
+  --bg-primary:   #0d1117;
   --bg-secondary: #111827;
-  --bg-card: rgba(22, 28, 44, 0.95);
+  --bg-card:      rgba(22, 28, 44, 0.95);
 
-  /* Borders */
-  --border-subtle: rgba(255,255,255,0.07);
+  --border-subtle:  rgba(255,255,255,0.07);
   --border-default: rgba(255,255,255,0.11);
-  --border-accent: rgba(99,102,241,0.3);
+  --border-accent:  rgba(99,102,241,0.3);
 
-  /* Text */
-  --text-primary: #e6edf3;
-  --text-secondary: #94a3b8;   /* slate-400 — minimum for real content */
-  --text-muted: #64748b;       /* slate-500 — decorative / hints only */
+  --text-primary:   #e6edf3;
+  --text-secondary: #94a3b8;
+  --text-muted:     #64748b;
 
-  /* LED colors */
-  --led-amber: #f59e0b;
+  --led-amber:      #f59e0b;
   --led-amber-glow: rgba(245,158,11,0.45);
-  --led-red: #ef4444;
-  --led-cyan: #06b6d4;
-  --accent: #6366f1;
+  --led-red:        #ef4444;
+  --led-cyan:       #06b6d4;
+  --accent:         #6366f1;
 }
 
 * { box-sizing: border-box; }
-
 html, body { margin: 0; padding: 0; }
 #root { margin: 0; padding: 0; }
 
@@ -77,7 +124,7 @@ code, pre {
   box-shadow: 0 0 20px rgba(99,102,241,0.1);
 }
 
-/* ─── LED slot states — only keyframe animations remain here ─────────────── */
+/* ─── LED slot states ────────────────────────────────────────────────────── */
 .slot-not-found {
   animation: led-blink 0.4s ease-in-out 6;
   pointer-events: none;
@@ -155,42 +202,6 @@ code, pre {
   color: #e2e8f0;
 }
 
-/* ─── Animations ─────────────────────────────────────────────────────────── */
-@keyframes led-pulse {
-  0%, 100% { box-shadow: 0 0 8px 2px rgba(245,158,11,0.4), 0 0 20px 4px rgba(245,158,11,0.2); }
-  50%       { box-shadow: 0 0 20px 6px rgba(245,158,11,0.7), 0 0 40px 10px rgba(245,158,11,0.3); }
-}
-
-@keyframes led-blink {
-  0%, 100% {
-    background-color: rgba(239,68,68,0.12);
-    box-shadow: none;
-    border-color: rgba(239,68,68,0.3);
-  }
-  50% {
-    background-color: rgba(239,68,68,0.55);
-    box-shadow: 0 0 20px 4px rgba(239,68,68,0.45);
-    border-color: #ef4444;
-  }
-}
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes slide-up {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50%       { transform: translateY(-6px); }
-}
-
-.animate-float { animation: float 3s ease-in-out infinite; }
-
 /* ─── Magazine grid ──────────────────────────────────────────────────────── */
 .magazine-grid { display: grid; gap: 5px; }
 
@@ -204,6 +215,6 @@ code, pre {
 }
 
 /* ─── Onboarding step indicators ─────────────────────────────────────────── */
-.step-active  { background: linear-gradient(135deg, #6366f1, #4f46e5); box-shadow: 0 0 16px rgba(99,102,241,0.5); }
-.step-done    { background: linear-gradient(135deg, #10b981, #059669); }
+.step-active   { background: linear-gradient(135deg, #6366f1, #4f46e5); box-shadow: 0 0 16px rgba(99,102,241,0.5); }
+.step-done     { background: linear-gradient(135deg, #10b981, #059669); }
 .step-inactive { background: rgba(22,28,44,0.9); border: 1px solid rgba(99,102,241,0.25); }

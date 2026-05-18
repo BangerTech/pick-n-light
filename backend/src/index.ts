@@ -1,33 +1,20 @@
 import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
+import Fastify from 'fastify';
+import cors from '@fastify/cors';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
 import prisma from './db';
 import { connectMqtt } from './services/wled';
-import magazinesRouter from './routes/magazines';
-import partsRouter from './routes/parts';
-import searchRouter from './routes/search';
-import wledRouter from './routes/wled';
-import voiceRouter from './routes/voice';
-import settingsRouter from './routes/settings';
-import tagsRouter from './routes/tags';
+import magazinesPlugin from './routes/magazines';
+import partsPlugin from './routes/parts';
+import searchPlugin from './routes/search';
+import wledPlugin from './routes/wled';
+import voicePlugin from './routes/voice';
+import settingsPlugin from './routes/settings';
+import tagsPlugin from './routes/tags';
+import wsPlugin from './routes/ws';
 
-const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
-
-app.use(cors());
-app.use(express.json());
-
-app.use('/api/magazines', magazinesRouter);
-app.use('/api/parts', partsRouter);
-app.use('/api/search', searchRouter);
-app.use('/api/wled', wledRouter);
-app.use('/api/voice', voiceRouter);
-app.use('/api/settings', settingsRouter);
-app.use('/api/tags', tagsRouter);
-
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
 
 async function seedDefaultSettings() {
   const defaults = [
@@ -36,7 +23,6 @@ async function seedDefaultSettings() {
     { key: 'not_found_color', value: '255,0,0' },
     { key: 'low_stock_color', value: '255,100,0' },
   ];
-
   for (const setting of defaults) {
     await prisma.setting.upsert({
       where: { key: setting.key },
@@ -47,6 +33,37 @@ async function seedDefaultSettings() {
 }
 
 async function main() {
+  const app = Fastify({ logger: process.env.NODE_ENV !== 'production' });
+
+  await app.register(cors, { origin: true });
+
+  await app.register(swagger, {
+    openapi: {
+      info: { title: 'Pick·n·Light API', version: '1.0.0' },
+      tags: [
+        { name: 'magazines', description: 'Magazin-Verwaltung' },
+        { name: 'parts', description: 'Teile-Verwaltung' },
+        { name: 'search', description: 'Suche & LED-Steuerung' },
+        { name: 'wled', description: 'WLED Geräte & MQTT' },
+        { name: 'voice', description: 'Sprachsteuerung Webhook' },
+        { name: 'settings', description: 'Einstellungen' },
+        { name: 'tags', description: 'Tags' },
+      ],
+    },
+  });
+  await app.register(swaggerUi, { routePrefix: '/api/docs' });
+
+  await app.register(magazinesPlugin, { prefix: '/api/magazines' });
+  await app.register(partsPlugin, { prefix: '/api/parts' });
+  await app.register(searchPlugin, { prefix: '/api/search' });
+  await app.register(wledPlugin, { prefix: '/api/wled' });
+  await app.register(voicePlugin, { prefix: '/api/voice' });
+  await app.register(settingsPlugin, { prefix: '/api/settings' });
+  await app.register(tagsPlugin, { prefix: '/api/tags' });
+  await app.register(wsPlugin, { prefix: '/api' });
+
+  app.get('/api/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+
   try {
     await prisma.$connect();
     console.log('[DB] Connected to PostgreSQL');
@@ -56,9 +73,9 @@ async function main() {
     const mqttUrl = process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883';
     connectMqtt(mqttUrl);
 
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`[API] Server running on port ${PORT}`);
-    });
+    await app.listen({ port: PORT, host: '0.0.0.0' });
+    console.log(`[API] Server running on port ${PORT}`);
+    console.log(`[API] Swagger docs: http://localhost:${PORT}/api/docs`);
   } catch (err) {
     console.error('[STARTUP] Fatal error:', err);
     process.exit(1);

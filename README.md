@@ -9,10 +9,13 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white" />
-  <img src="https://img.shields.io/badge/Node.js-20-339933?logo=node.js&logoColor=white" />
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white" />
+  <img src="https://img.shields.io/badge/Fastify-5-000000?logo=fastify&logoColor=white" />
+  <img src="https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white" />
+  <img src="https://img.shields.io/badge/Tailwind-v4-06B6D4?logo=tailwindcss&logoColor=white" />
   <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white" />
   <img src="https://img.shields.io/badge/WLED-MQTT-F59E0B?logo=arduino&logoColor=white" />
+  <img src="https://img.shields.io/badge/PWA-installable-5A0FC8?logo=googlechrome&logoColor=white" />
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" />
 </p>
 
@@ -42,6 +45,8 @@
 - [Traefik Setup](#traefik-setup)
 - [WLED Integration](#wled-integration)
 - [Voice Integration](#voice-integration)
+- [Barcode & QR Scanner](#barcode--qr-scanner)
+- [PWA Installation](#pwa-installation)
 - [API Reference](#api-reference)
 - [Ports](#ports)
 - [Project Structure](#project-structure)
@@ -64,6 +69,12 @@ It uses [WLED](https://kno.wled.ge/)-powered LED strips (one per cabinet) contro
 - **💡 LED-guided Search**  
   Type a search term — the matching cabinet slot lights up in amber within milliseconds. All other LEDs turn off automatically after a configurable timeout.
 
+- **📸 Barcode & QR Scanner**  
+  Tap the scan button in the search bar to use your device's camera. Supports QR codes, EAN-13, EAN-8, Code-128, Code-39, and DataMatrix via the native `BarcodeDetector` API (Chrome/Edge/Android) with `@zxing/browser` as fallback for Firefox and older browsers.
+
+- **🖨️ QR Labels**  
+  Print a QR label for any part directly from the part editor — shows the QR code, part name, and slot position. Scan to search instantly.
+
 - **📦 Multi-Cabinet Support**  
   Manage any number of physical cabinets. Each has its own LED strip, row/column layout, and WLED device.
 
@@ -71,19 +82,28 @@ It uses [WLED](https://kno.wled.ge/)-powered LED strips (one per cabinet) contro
   View 2, 4, or more cabinets side by side in a configurable grid — perfect for a wall-mounted tablet showing your entire storage wall at once.
 
 - **🏷️ Global Tags with Autocomplete**  
-  Tags are shared across all parts. When typing a tag, existing tags from your entire inventory are suggested — so you can group all screws, all capacitors, or all M4 hardware regardless of which cabinet they're in.
+  Tags are shared across all parts. When typing a tag, existing tags from your entire inventory are suggested.
 
 - **📉 Low-Stock Warnings**  
   Set a minimum quantity per part. Slots below the threshold are highlighted in orange and counted in the stats bar.
 
 - **🧩 Flexible LED Mapping**  
-  Configure LEDs per slot, gap LEDs between slots, row padding, a global strip offset, serpentine layout, strip origin corner, and a special large bottom slot — all without touching code.
+  Configure LEDs per slot, gap LEDs, row padding, strip offset, serpentine layout, strip origin corner, and a special large bottom slot — all without touching code.
 
 - **🎙️ Voice Search (Alexa / Home Assistant)**  
-  A webhook endpoint accepts voice queries from Alexa Skills, Home Assistant automations, or IFTTT — the LED lights up hands-free.
+  A webhook endpoint accepts voice queries from Alexa Skills, Home Assistant automations, or any HTTP client.
+
+- **📱 PWA – Installable App**  
+  Install Pick·n·Light as a standalone app on any device. Works offline for read access (Service Worker with Workbox, NetworkFirst for API calls).
+
+- **⚡ Real-time LED Status**  
+  WebSocket connection (`/api/ws`) pushes LED state changes and MQTT connection status to all connected clients instantly — no polling.
+
+- **📖 OpenAPI / Swagger Docs**  
+  Interactive API documentation available at `/api/docs` (Fastify + @fastify/swagger-ui).
 
 - **📱 Fully Responsive**  
-  Optimized for both desktop and mobile (iPhone 15 / Android). Bottom navigation bar on small screens, bottom-sheet modals, safe-area support.
+  Optimized for both desktop and mobile. Bottom navigation bar on small screens, bottom-sheet modals, safe-area support.
 
 - **🔁 Cabinet Duplication**  
   Duplicate any cabinet configuration (without its parts) to quickly set up an identical second cabinet.
@@ -97,11 +117,14 @@ It uses [WLED](https://kno.wled.ge/)-powered LED strips (one per cabinet) contro
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Vite, TypeScript, Tailwind CSS, Framer Motion |
-| Backend | Node.js 20, Express, TypeScript, Prisma ORM |
+| Frontend | React 19, Vite 6, TypeScript, Tailwind CSS v4, Framer Motion, TanStack Query v5 |
+| Backend | Node.js 22, Fastify 5, TypeScript, Prisma 7 (adapter-pg) |
 | Database | PostgreSQL 16 |
 | LED Control | WLED (MQTT JSON API) |
 | MQTT Broker | Eclipse Mosquitto 2 (bundled) |
+| Barcode | BarcodeDetector API + @zxing/browser fallback |
+| PWA | vite-plugin-pwa (Workbox) |
+| API Docs | @fastify/swagger + @fastify/swagger-ui |
 | Serving | Nginx (SPA + API reverse proxy) |
 | Containerisation | Docker + Docker Compose |
 
@@ -149,7 +172,6 @@ POSTGRES_PASSWORD=your_secure_password
 # Optional — defaults shown
 POSTGRES_USER=picknlight
 POSTGRES_DB=picknlight
-JWT_SECRET=changeme
 LED_AUTO_OFF_SECONDS=30
 ```
 
@@ -158,7 +180,6 @@ LED_AUTO_OFF_SECONDS=30
 | `POSTGRES_PASSWORD` | — | PostgreSQL password **(required)** |
 | `POSTGRES_DB` | `picknlight` | Database name |
 | `POSTGRES_USER` | `picknlight` | Database user |
-| `JWT_SECRET` | — | Secret for future auth (optional) |
 | `LED_AUTO_OFF_SECONDS` | `30` | Seconds until LEDs auto-off after search |
 
 ---
@@ -267,7 +288,39 @@ The matching LED slot lights up immediately. If nothing is found, all LEDs flash
 
 ---
 
+## Barcode & QR Scanner
+
+Tap the scan icon (next to the microphone button) in the search bar to open the camera scanner.
+
+**Supported formats:** QR Code, EAN-13, EAN-8, Code-128, Code-39, DataMatrix
+
+**Browser support:**
+- **Native `BarcodeDetector` API** (Chrome 83+, Edge, Android Chrome) — zero WASM overhead
+- **`@zxing/browser` fallback** — for Firefox, Safari, and older browsers
+
+The scanned value is passed directly to the search — the matching LED lights up.
+
+### Print QR Labels
+
+In the part editor (slot modal), click the QR icon to generate a printable label. The label contains the QR code (encodes the part name), the part name, and the slot position. Scan the label later to instantly search for that part.
+
+---
+
+## PWA Installation
+
+Pick·n·Light can be installed as a standalone app on any device.
+
+1. Open **http://your-server:7050** in Chrome, Edge, or Safari
+2. Go to **Settings** → tap **"Als App installieren"**
+3. Or use the browser's native install prompt (address bar icon on desktop)
+
+**Offline support:** The app shell and all static assets are cached by the Service Worker. API responses are served from cache when offline (last known data).
+
+---
+
 ## API Reference
+
+Full interactive docs: **`/api/docs`** (Swagger UI)
 
 ### Magazines
 ```
@@ -301,11 +354,13 @@ GET    /api/tags                        All unique tags across all parts (global
 
 ### WLED Devices
 ```
+GET    /api/wled/status                 MQTT connection status (HTTP)
 GET    /api/wled/devices                List devices
 POST   /api/wled/devices                Add device
 PUT    /api/wled/devices/:id            Edit device
 DELETE /api/wled/devices/:id            Remove device
 POST   /api/wled/devices/:id/test       LED test (flash / sequence)
+POST   /api/wled/devices/:id/light-range  Light a specific LED range
 POST   /api/wled/devices/:id/all-off    Turn off all LEDs
 ```
 
@@ -318,6 +373,18 @@ POST   /api/voice/search                { "query": "M4 Schraube" }
 ```
 GET    /api/settings                    Get all settings
 PUT    /api/settings                    Update settings
+```
+
+### WebSocket
+```
+WS     /api/ws                          Real-time LED state + MQTT status events
+```
+
+Events pushed by the server:
+```json
+{ "type": "mqtt_status", "status": "connected" }
+{ "type": "led_on", "mqttTopic": "wled/magazin1", "ledStart": 5, "ledCount": 4, "color": [255,165,0] }
+{ "type": "led_off", "mqttTopic": "wled/magazin1" }
 ```
 
 ---
@@ -338,23 +405,33 @@ PUT    /api/settings                    Update settings
 
 ```
 picknlight/
-├── frontend/                   # React + Vite SPA
+├── frontend/                   # React 19 + Vite SPA
 │   └── src/
-│       ├── components/         # MagazineGrid, SlotModal, Sidebar, WallMagazineCard, …
-│       ├── pages/              # Dashboard, Search, Settings, Onboarding
-│       ├── lib/                # API client, TypeScript types, utilities
+│       ├── components/         # MagazineGrid, SlotModal, BarcodeScannerModal, Sidebar, …
+│       ├── pages/              # Dashboard, Search, Settings, Onboarding (lazy loaded)
+│       ├── lib/                # API client, types, utils, hooks
+│       │   ├── useBarcodeScanner.ts   # BarcodeDetector + @zxing fallback
+│       │   ├── usePwaInstall.ts       # beforeinstallprompt handler
+│       │   └── useWledStatus.ts       # WebSocket LED state hook
 │       └── store/              # Zustand global state (persisted)
-├── backend/                    # Node.js + Express API
+├── backend/                    # Node.js 22 + Fastify 5 API
 │   └── src/
-│       ├── routes/             # magazines, parts, search, wled, voice, settings, tags
-│       ├── services/           # WLED MQTT service, LED calculator
-│       └── prisma/             # Schema + migrations
+│       ├── routes/             # magazines, parts, search, wled, voice, settings, tags, ws
+│       ├── services/           # WLED MQTT service (with EventEmitter), LED calculator
+│       ├── generated/          # Prisma 7 generated client (auto-generated, not committed)
+│       └── db.ts               # PrismaClient with @prisma/adapter-pg
+├── backend/prisma/
+│   ├── schema.prisma           # Prisma schema (generator: prisma-client, no url)
+│   ├── prisma.config.ts        # Prisma 7 config (DATABASE_URL for migrations)
+│   └── migrations/             # SQL migrations (006 total)
 ├── mosquitto/                  # Mosquitto config
 ├── nginx/                      # Nginx reverse proxy config
-├── docs/                       # Screenshots
-├── docker-compose.yml
+├── docs/                       # Screenshots + Alexa/HA integration files
+├── docker-compose.example.yml
+├── docker-compose.traefik.example.yml
 ├── .env.example
-└── picknlight.md               # Full developer reference (schema, API, LED math)
+├── README.md
+└── picknlight.md               # Full developer reference (schema, API, LED math, architecture)
 ```
 
 ---

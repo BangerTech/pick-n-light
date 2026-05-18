@@ -100,7 +100,7 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-accent-DEFAULT border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -145,7 +145,7 @@ export default function Dashboard() {
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all border',
                   activeMag?.id === mag.id
-                    ? 'bg-accent-DEFAULT/20 text-accent-light border-accent-DEFAULT/30'
+                    ? 'bg-accent/20 text-accent-light border-accent/30'
                     : 'text-slate-400 hover:text-slate-200 border-transparent hover:bg-white/5'
                 )}
               >
@@ -208,7 +208,7 @@ export default function Dashboard() {
                   className={cn(
                     'w-7 h-7 flex items-center justify-center transition-all',
                     wallColumns === cols
-                      ? 'bg-accent-DEFAULT/20 text-accent-light'
+                      ? 'bg-accent/20 text-accent-light'
                       : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
                   )}
                 >
@@ -225,7 +225,7 @@ export default function Dashboard() {
             className={cn(
               'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border',
               wallView
-                ? 'bg-accent-DEFAULT/20 text-accent-light border-accent-DEFAULT/30'
+                ? 'bg-accent/20 text-accent-light border-accent/30'
                 : 'text-slate-500 hover:text-slate-300 border-transparent hover:bg-white/5'
             )}
           >
@@ -357,7 +357,7 @@ export default function Dashboard() {
               {/* Grid */}
               {isDetailLoading ? (
                 <div className="flex justify-center py-20">
-                  <div className="w-8 h-8 border-2 border-accent-DEFAULT border-t-transparent rounded-full animate-spin" />
+                  <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : magazineDetail ? (
                 <MagazineGrid magazine={magazineDetail} onRefresh={handleRefresh} />

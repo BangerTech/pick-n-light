@@ -1,7 +1,20 @@
 import mqtt from 'mqtt';
+import { EventEmitter } from 'events';
 
 let client: mqtt.MqttClient | null = null;
 const activeTimers: Map<string, NodeJS.Timeout> = new Map();
+
+// EventEmitter für WebSocket-Broadcasts
+export const wledEvents = new EventEmitter();
+
+export interface LedStateEvent {
+  type: 'led_on' | 'led_off' | 'mqtt_status';
+  mqttTopic?: string;
+  ledStart?: number;
+  ledCount?: number;
+  color?: [number, number, number];
+  status?: 'connected' | 'disconnected' | 'connecting';
+}
 
 export function connectMqtt(brokerUrl: string): void {
   client = mqtt.connect(brokerUrl, {
@@ -11,14 +24,17 @@ export function connectMqtt(brokerUrl: string): void {
 
   client.on('connect', () => {
     console.log(`[MQTT] Connected to broker: ${brokerUrl}`);
+    wledEvents.emit('state', { type: 'mqtt_status', status: 'connected' });
   });
 
   client.on('error', (err) => {
     console.error('[MQTT] Error:', err.message);
+    wledEvents.emit('state', { type: 'mqtt_status', status: 'disconnected' });
   });
 
   client.on('offline', () => {
     console.warn('[MQTT] Broker offline, reconnecting...');
+    wledEvents.emit('state', { type: 'mqtt_status', status: 'connecting' });
   });
 }
 
@@ -78,6 +94,8 @@ export function lightSlot(
     ],
   });
 
+  wledEvents.emit('state', { type: 'led_on', mqttTopic, ledStart, ledCount, color });
+
   if (autoOffSeconds && autoOffSeconds > 0) {
     const timer = setTimeout(() => {
       turnOffAll(mqttTopic);
@@ -92,6 +110,7 @@ export function lightSlot(
  */
 export function turnOffAll(mqttTopic: string): void {
   publish(mqttTopic, { on: false });
+  wledEvents.emit('state', { type: 'led_off', mqttTopic });
 }
 
 /**

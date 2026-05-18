@@ -14,13 +14,18 @@ import {
   Zap,
   Clock,
   Palette,
+  Download,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { WledDevice } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { usePwaInstall } from '@/lib/usePwaInstall';
+import { useWledStatus } from '@/lib/useWledStatus';
 
 export default function Settings() {
   const queryClient = useQueryClient();
+  const { canInstall, isInstalled, install } = usePwaInstall();
+  const { mqttStatus: wsMqttStatus } = useWledStatus();
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ['settings'],
@@ -37,11 +42,8 @@ export default function Settings() {
     queryFn: api.magazines.list,
   });
 
-  const { data: mqttStatus } = useQuery({
-    queryKey: ['mqtt-status'],
-    queryFn: api.wled.status,
-    refetchInterval: 5000,
-  });
+  // MQTT-Status kommt jetzt per WebSocket (kein Polling mehr)
+  const mqttStatus = { status: wsMqttStatus };
 
   // Settings form
   const [autoOff, setAutoOff] = useState('30');
@@ -228,7 +230,7 @@ export default function Settings() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold text-white flex items-center gap-2">
-                <Wifi className="w-4 h-4 text-accent-DEFAULT" /> WLED Geräte
+                <Wifi className="w-4 h-4 text-accent" /> WLED Geräte
               </h2>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>ESP32/ESP8266 mit WLED-Firmware</p>
             </div>
@@ -246,7 +248,7 @@ export default function Settings() {
 
           {devicesLoading ? (
             <div className="flex justify-center py-8">
-              <div className="w-6 h-6 border-2 border-accent-DEFAULT border-t-transparent rounded-full animate-spin" />
+              <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
             </div>
           ) : devices.length === 0 ? (
             <div
@@ -604,6 +606,38 @@ export default function Settings() {
             </div>
           </div>
         </section>
+
+        {/* PWA Install */}
+        {(canInstall || isInstalled) && (
+          <section
+            className="rounded-2xl p-5"
+            style={{ background: 'var(--bg-2)', border: '1px solid var(--border-default)' }}
+          >
+            <h2 className="text-base font-semibold text-white mb-3 flex items-center gap-2">
+              <Download className="w-4 h-4 text-accent-light" />
+              App installieren
+            </h2>
+            {isInstalled ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-400">
+                <Check className="w-4 h-4" />
+                Pick·n·Light ist als App installiert
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  Installiere Pick·n·Light als eigenständige App – kein Browser nötig, funktioniert auch offline (Lesezugriff).
+                </p>
+                <button
+                  onClick={install}
+                  className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm w-fit"
+                >
+                  <Download className="w-4 h-4" />
+                  Als App installieren
+                </button>
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </div>
   );

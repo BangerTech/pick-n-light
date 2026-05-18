@@ -1,11 +1,13 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search as SearchIcon, X, Zap, Package, MapPin, AlertTriangle, Mic, MicOff } from 'lucide-react';
+import { Search as SearchIcon, X, Zap, Package, MapPin, AlertTriangle, Mic, MicOff, ScanLine } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useAppStore } from '@/store';
 import type { SearchResult } from '@/lib/types';
 import { cn, isLowStock, formatQuantity } from '@/lib/utils';
+
+const BarcodeScannerModal = lazy(() => import('@/components/BarcodeScannerModal'));
 
 
 function parseRgb(str: string | undefined): [number, number, number] {
@@ -134,6 +136,7 @@ export default function Search() {
   const [activeResultId, setActiveResultId] = useState<number | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
   const { setHighlightedSlotId, triggerNotFoundBlink } = useAppStore();
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -335,7 +338,7 @@ export default function Search() {
               />
               <div className="flex items-center gap-2">
                 {isSearching && (
-                  <div className="w-5 h-5 border-2 border-accent-DEFAULT border-t-transparent rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
                 )}
                 {displayQuery && !isSearching && !isListening && (
                   <button
@@ -361,12 +364,19 @@ export default function Search() {
                     {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                   </motion.button>
                 )}
+                <button
+                  onClick={() => setShowScanner(true)}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-led-cyan hover:bg-led-cyan/10 transition-all"
+                  title="Barcode / QR-Code scannen"
+                >
+                  <ScanLine className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
             {/* Progress bar — search or listening indicator */}
             {isSearching && (
-              <div className="h-0.5 bg-gradient-to-r from-accent-DEFAULT via-led-cyan to-accent-DEFAULT animate-pulse" />
+              <div className="h-0.5 bg-gradient-to-r from-accent via-led-cyan to-accent animate-pulse" />
             )}
             {isListening && !isSearching && (
               <motion.div
@@ -407,7 +417,7 @@ export default function Search() {
                 className="w-16 h-16 rounded-2xl flex items-center justify-center"
                 style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}
               >
-                <Zap className="w-8 h-8 text-accent-DEFAULT" />
+                <Zap className="w-8 h-8 text-accent" />
               </div>
               <div>
                 <p className="text-slate-300 font-medium mb-1">Suche nach Teilen</p>
@@ -501,7 +511,7 @@ export default function Search() {
                         {isActive ? (
                           <Zap className="w-4 h-4" style={{ color: hColor }} fill="currentColor" />
                         ) : (
-                          <Package className="w-4 h-4 text-accent-DEFAULT" />
+                          <Package className="w-4 h-4 text-accent" />
                         )}
                       </div>
 
@@ -580,7 +590,7 @@ export default function Search() {
           style={{ background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.18)' }}
         >
           <div className="flex items-center gap-2 mb-1">
-            <Mic className="w-3.5 h-3.5 text-accent-DEFAULT" />
+            <Mic className="w-3.5 h-3.5 text-accent" />
             <p className="text-xs font-semibold text-accent-light">Sprachsteuerung / Alexa / Home Assistant</p>
           </div>
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -594,6 +604,19 @@ export default function Search() {
           )}
         </div>
       </div>
+
+      {/* Barcode / QR Scanner */}
+      {showScanner && (
+        <Suspense fallback={null}>
+          <BarcodeScannerModal
+            onResult={(value) => {
+              setQuery(value);
+              doSearch(value);
+            }}
+            onClose={() => setShowScanner(false)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

@@ -80,7 +80,7 @@ export default function WallMagazineCard({ mag, index, compact }: WallMagazineCa
       <div className="p-2 sm:p-3 flex-1">
         {isLoading ? (
           <div className="flex justify-center py-6">
-            <div className="w-5 h-5 border-2 border-accent-DEFAULT border-t-transparent rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
           </div>
         ) : detail ? (
           <MagazineGrid magazine={detail} onRefresh={handleRefresh} compact={compact} />

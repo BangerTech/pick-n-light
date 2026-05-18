@@ -1,174 +1,158 @@
-import { Router, Request, Response } from 'express';
+import { FastifyPluginAsync } from 'fastify';
 import prisma from '../db';
 import { runTestSequence, getMqttStatus, flashAll, lightSlot, turnOffAll } from '../services/wled';
 import { totalLedCount } from '../services/ledCalculator';
 
-const router = Router();
+const plugin: FastifyPluginAsync = async (fastify) => {
+  fastify.get('/status', { schema: { tags: ['wled'] } }, async () => {
+    return { status: getMqttStatus() };
+  });
 
-router.get('/status', (_req: Request, res: Response) => {
-  res.json({ status: getMqttStatus() });
-});
-
-router.get('/devices', async (_req: Request, res: Response) => {
-  try {
-    const devices = await prisma.wledDevice.findMany({
-      include: { magazine: { select: { id: true, name: true } } },
-      orderBy: { createdAt: 'asc' },
-    });
-    res.json(devices);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch WLED devices' });
-  }
-});
-
-router.post('/devices', async (req: Request, res: Response) => {
-  try {
-    const { magazineId, name, ipAddress, mqttTopic, ledCount } = req.body;
-
-    if (!magazineId || !name || !mqttTopic || !ledCount) {
-      res.status(400).json({ error: 'magazineId, name, mqttTopic and ledCount are required' });
-      return;
+  fastify.get('/devices', { schema: { tags: ['wled'] } }, async (_request, reply) => {
+    try {
+      const devices = await prisma.wledDevice.findMany({
+        include: { magazine: { select: { id: true, name: true } } },
+        orderBy: { createdAt: 'asc' },
+      });
+      return devices;
+    } catch {
+      reply.code(500);
+      return { error: 'Failed to fetch WLED devices' };
     }
+  });
 
-    const device = await prisma.wledDevice.create({
-      data: { magazineId, name, ipAddress: ipAddress || null, mqttTopic, ledCount },
-      include: { magazine: { select: { id: true, name: true } } },
-    });
+  fastify.post('/devices', { schema: { tags: ['wled'] } }, async (request, reply) => {
+    try {
+      const { magazineId, name, ipAddress, mqttTopic, ledCount } =
+        request.body as { magazineId: number; name: string; ipAddress?: string; mqttTopic: string; ledCount: number };
 
-    res.status(201).json(device);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to create WLED device' });
-  }
-});
+      if (!magazineId || !name || !mqttTopic || !ledCount) {
+        reply.code(400);
+        return { error: 'magazineId, name, mqttTopic and ledCount are required' };
+      }
 
-router.put('/devices/:id', async (req: Request, res: Response) => {
-  try {
-    const id = parseInt(req.params.id as string);
-    const { name, ipAddress, mqttTopic, ledCount } = req.body;
+      const device = await prisma.wledDevice.create({
+        data: { magazineId, name, ipAddress: ipAddress || null, mqttTopic, ledCount },
+        include: { magazine: { select: { id: true, name: true } } },
+      });
+      reply.code(201);
+      return device;
+    } catch {
+      reply.code(500);
+      return { error: 'Failed to create WLED device' };
+    }
+  });
 
-    const device = await prisma.wledDevice.update({
-      where: { id },
-      data: {
-        ...(name !== undefined && { name }),
-        ...(ipAddress !== undefined && { ipAddress }),
-        ...(mqttTopic !== undefined && { mqttTopic }),
-        ...(ledCount !== undefined && { ledCount }),
-      },
-      include: { magazine: { select: { id: true, name: true } } },
-    });
+  fastify.put<{ Params: { id: string } }>('/devices/:id', { schema: { tags: ['wled'] } }, async (request, reply) => {
+    try {
+      const id = parseInt(request.params.id);
+      const { name, ipAddress, mqttTopic, ledCount } =
+        request.body as { name?: string; ipAddress?: string; mqttTopic?: string; ledCount?: number };
 
-    res.json(device);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update WLED device' });
-  }
-});
-
-router.delete('/devices/:id', async (req: Request, res: Response) => {
-  try {
-    const id = parseInt(req.params.id as string);
-    await prisma.wledDevice.delete({ where: { id } });
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to delete WLED device' });
-  }
-});
-
-/**
- * Light a specific LED range.
- * Requires ledStart + ledCount in body. totalLeds is looked up from the device's magazine.
- */
-router.post('/devices/:id/light-range', async (req: Request, res: Response) => {
-  try {
-    const id = parseInt(req.params.id as string);
-    const { ledStart, ledCount, color, totalLedsOverride } = req.body;
-
-    const device = await prisma.wledDevice.findUnique({
-      where: { id },
-      include: { magazine: true },
-    });
-    if (!device) { res.status(404).json({ error: 'Device not found' }); return; }
-
-    const m = device.magazine;
-    const leds = typeof totalLedsOverride === 'number' && totalLedsOverride > 0
-      ? totalLedsOverride
-      : totalLedCount(m.rows, m.columns, m.ledsPerSlot, m.bottomRowLarge, m.ledGap, m.ledSkipFirst, m.largeRowLeds, m.rowPadding);
-
-    const rgb: [number, number, number] =
-      Array.isArray(color) && color.length === 3
-        ? [Number(color[0]), Number(color[1]), Number(color[2])]
-        : [0, 200, 255];
-
-    lightSlot(device.mqttTopic, ledStart, ledCount, leds, rgb);
-    res.json({ success: true, totalLeds: leds });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to light range' });
-  }
-});
-
-router.post('/devices/:id/all-off', async (req: Request, res: Response) => {
-  try {
-    const id = parseInt(req.params.id as string);
-    const device = await prisma.wledDevice.findUnique({ where: { id } });
-    if (!device) { res.status(404).json({ error: 'Device not found' }); return; }
-    turnOffAll(device.mqttTopic);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to turn off' });
-  }
-});
-
-router.post('/devices/:id/test', async (req: Request, res: Response) => {
-  try {
-    const id = parseInt(req.params.id as string);
-    const device = await prisma.wledDevice.findUnique({
-      where: { id },
-      include: {
-        magazine: {
-          include: {
-            slots: { orderBy: [{ row: 'asc' }, { col: 'asc' }] },
-          },
+      const device = await prisma.wledDevice.update({
+        where: { id },
+        data: {
+          ...(name !== undefined && { name }),
+          ...(ipAddress !== undefined && { ipAddress }),
+          ...(mqttTopic !== undefined && { mqttTopic }),
+          ...(ledCount !== undefined && { ledCount }),
         },
-      },
-    });
-
-    if (!device) {
-      res.status(404).json({ error: 'WLED device not found' });
-      return;
-    }
-
-    const m2 = device.magazine;
-    const { mode: modeRaw, delayMs: delayMsRaw, totalLedsOverride, slotOverrides } = req.body;
-    const leds = typeof totalLedsOverride === 'number' && totalLedsOverride > 0
-      ? totalLedsOverride
-      : totalLedCount(m2.rows, m2.columns, m2.ledsPerSlot, m2.bottomRowLarge, m2.ledGap, m2.ledSkipFirst, m2.largeRowLeds, m2.rowPadding);
-
-    const mode = (modeRaw as string) || 'flash';
-
-    if (mode === 'sequence') {
-      const delayMs = parseInt(delayMsRaw || '400', 10);
-      const slots = Array.isArray(slotOverrides) && slotOverrides.length > 0
-        ? slotOverrides as { ledStart: number; ledCount: number }[]
-        : device.magazine.slots.map((s) => ({ ledStart: s.ledStart, ledCount: s.ledCount }));
-      runTestSequence(device.mqttTopic, slots, leds, delayMs);
-      res.json({
-        success: true,
-        message: 'Sequence test started',
-        totalLeds: leds,
-        mqttTopic: `${device.mqttTopic}/api`,
+        include: { magazine: { select: { id: true, name: true } } },
       });
-    } else {
-      // Persistent flash: all LEDs on, stay on until user clicks "Alle Aus"
-      flashAll(device.mqttTopic, leds, [0, 200, 255], true);
-      res.json({
-        success: true,
-        message: 'All LEDs on — click "Alle Aus" to turn off',
-        totalLeds: leds,
-        mqttTopic: `${device.mqttTopic}/api`,
-      });
+      return device;
+    } catch {
+      reply.code(500);
+      return { error: 'Failed to update WLED device' };
     }
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to start test' });
-  }
-});
+  });
 
-export default router;
+  fastify.delete<{ Params: { id: string } }>('/devices/:id', { schema: { tags: ['wled'] } }, async (request, reply) => {
+    try {
+      const id = parseInt(request.params.id);
+      await prisma.wledDevice.delete({ where: { id } });
+      return { success: true };
+    } catch {
+      reply.code(500);
+      return { error: 'Failed to delete WLED device' };
+    }
+  });
+
+  fastify.post<{ Params: { id: string } }>('/devices/:id/light-range', { schema: { tags: ['wled'] } }, async (request, reply) => {
+    try {
+      const id = parseInt(request.params.id);
+      const { ledStart, ledCount, color, totalLedsOverride } =
+        request.body as { ledStart: number; ledCount: number; color?: [number, number, number]; totalLedsOverride?: number };
+
+      const device = await prisma.wledDevice.findUnique({ where: { id }, include: { magazine: true } });
+      if (!device) { reply.code(404); return { error: 'Device not found' }; }
+
+      const m = device.magazine;
+      const leds = typeof totalLedsOverride === 'number' && totalLedsOverride > 0
+        ? totalLedsOverride
+        : totalLedCount(m.rows, m.columns, m.ledsPerSlot, m.bottomRowLarge, m.ledGap, m.ledSkipFirst, m.largeRowLeds, m.rowPadding);
+
+      const rgb: [number, number, number] =
+        Array.isArray(color) && color.length === 3
+          ? [Number(color[0]), Number(color[1]), Number(color[2])]
+          : [0, 200, 255];
+
+      lightSlot(device.mqttTopic, ledStart, ledCount, leds, rgb);
+      return { success: true, totalLeds: leds };
+    } catch {
+      reply.code(500);
+      return { error: 'Failed to light range' };
+    }
+  });
+
+  fastify.post<{ Params: { id: string } }>('/devices/:id/all-off', { schema: { tags: ['wled'] } }, async (request, reply) => {
+    try {
+      const id = parseInt(request.params.id);
+      const device = await prisma.wledDevice.findUnique({ where: { id } });
+      if (!device) { reply.code(404); return { error: 'Device not found' }; }
+      turnOffAll(device.mqttTopic);
+      return { success: true };
+    } catch {
+      reply.code(500);
+      return { error: 'Failed to turn off' };
+    }
+  });
+
+  fastify.post<{ Params: { id: string } }>('/devices/:id/test', { schema: { tags: ['wled'] } }, async (request, reply) => {
+    try {
+      const id = parseInt(request.params.id);
+      const device = await prisma.wledDevice.findUnique({
+        where: { id },
+        include: { magazine: { include: { slots: { orderBy: [{ row: 'asc' }, { col: 'asc' }] } } } },
+      });
+
+      if (!device) { reply.code(404); return { error: 'WLED device not found' }; }
+
+      const m = device.magazine;
+      const { mode: modeRaw, delayMs: delayMsRaw, totalLedsOverride, slotOverrides } =
+        request.body as { mode?: string; delayMs?: number; totalLedsOverride?: number; slotOverrides?: { ledStart: number; ledCount: number }[] };
+
+      const leds = typeof totalLedsOverride === 'number' && totalLedsOverride > 0
+        ? totalLedsOverride
+        : totalLedCount(m.rows, m.columns, m.ledsPerSlot, m.bottomRowLarge, m.ledGap, m.ledSkipFirst, m.largeRowLeds, m.rowPadding);
+
+      const mode = modeRaw || 'flash';
+
+      if (mode === 'sequence') {
+        const delayMs = typeof delayMsRaw === 'number' ? delayMsRaw : 400;
+        const slots = Array.isArray(slotOverrides) && slotOverrides.length > 0
+          ? slotOverrides
+          : device.magazine.slots.map((s) => ({ ledStart: s.ledStart, ledCount: s.ledCount }));
+        runTestSequence(device.mqttTopic, slots, leds, delayMs);
+        return { success: true, message: 'Sequence test started', totalLeds: leds, mqttTopic: `${device.mqttTopic}/api` };
+      } else {
+        flashAll(device.mqttTopic, leds, [0, 200, 255], true);
+        return { success: true, message: 'All LEDs on — click "Alle Aus" to turn off', totalLeds: leds, mqttTopic: `${device.mqttTopic}/api` };
+      }
+    } catch {
+      reply.code(500);
+      return { error: 'Failed to start test' };
+    }
+  });
+};
+
+export default plugin;

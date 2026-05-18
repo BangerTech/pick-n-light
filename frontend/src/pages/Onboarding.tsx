@@ -403,7 +403,7 @@ export default function Onboarding() {
                     <label className="flex items-center gap-3 cursor-pointer">
                       <div className="relative">
                         <input type="checkbox" className="sr-only" checked={bottomRowLarge} onChange={(e) => setBottomRowLarge(e.target.checked)} />
-                        <div className={cn('w-11 h-6 rounded-full transition-all duration-200', bottomRowLarge ? 'bg-accent-DEFAULT' : 'bg-slate-700')} />
+                        <div className={cn('w-11 h-6 rounded-full transition-all duration-200', bottomRowLarge ? 'bg-accent' : 'bg-slate-700')} />
                         <div className={cn('absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-200 shadow', bottomRowLarge ? 'left-6' : 'left-1')} />
                       </div>
                       <div>
@@ -469,7 +469,7 @@ export default function Onboarding() {
                     <label className="flex items-center gap-3 cursor-pointer">
                       <div className="relative">
                         <input type="checkbox" className="sr-only" checked={skipWled} onChange={(e) => setSkipWled(e.target.checked)} />
-                        <div className={cn('w-11 h-6 rounded-full transition-all duration-200', skipWled ? 'bg-accent-DEFAULT' : 'bg-slate-700')} />
+                        <div className={cn('w-11 h-6 rounded-full transition-all duration-200', skipWled ? 'bg-accent' : 'bg-slate-700')} />
                         <div className={cn('absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-200 shadow', skipWled ? 'left-6' : 'left-1')} />
                       </div>
                       <p className="text-sm font-medium text-slate-300">WLED später einrichten</p>
