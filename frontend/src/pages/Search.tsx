@@ -348,29 +348,6 @@ export default function Search() {
                     <X className="w-4 h-4" />
                   </button>
                 )}
-                {speechSupported && (
-                  <motion.button
-                    onClick={handleMicClick}
-                    className={cn(
-                      'w-8 h-8 flex items-center justify-center rounded-xl transition-all',
-                      isListening
-                        ? 'text-red-400 bg-red-500/15'
-                        : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-                    )}
-                    title={isListening ? 'Aufnahme stoppen' : 'Sprachsuche starten'}
-                    animate={isListening ? { scale: [1, 1.15, 1] } : { scale: 1 }}
-                    transition={isListening ? { repeat: Infinity, duration: 1.2, ease: 'easeInOut' } : {}}
-                  >
-                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                  </motion.button>
-                )}
-                <button
-                  onClick={() => setShowScanner(true)}
-                  className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-led-cyan hover:bg-led-cyan/10 transition-all"
-                  title="Barcode / QR-Code scannen"
-                >
-                  <ScanLine className="w-4 h-4" />
-                </button>
               </div>
             </div>
 
@@ -401,6 +378,54 @@ export default function Search() {
               </motion.p>
             )}
           </AnimatePresence>
+
+          {/* Voice & Scan standalone buttons */}
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            {speechSupported ? (
+              <motion.button
+                onClick={handleMicClick}
+                className={cn(
+                  'flex items-center justify-center gap-3 rounded-2xl px-4 py-4 text-sm font-semibold transition-all duration-200 select-none',
+                  isListening
+                    ? 'text-red-300 border border-red-500/50'
+                    : 'text-slate-300 hover:text-white border border-white/10 hover:border-white/20'
+                )}
+                style={
+                  isListening
+                    ? { background: 'rgba(239,68,68,0.12)', boxShadow: '0 0 20px rgba(239,68,68,0.15)' }
+                    : { background: 'rgba(255,255,255,0.04)' }
+                }
+                title={isListening ? 'Aufnahme stoppen' : 'Sprachsuche starten'}
+                animate={isListening ? { scale: [1, 1.03, 1] } : { scale: 1 }}
+                transition={isListening ? { repeat: Infinity, duration: 1.2, ease: 'easeInOut' } : {}}
+              >
+                {isListening ? (
+                  <MicOff className="w-5 h-5 text-red-400 flex-shrink-0" />
+                ) : (
+                  <Mic className="w-5 h-5 flex-shrink-0" />
+                )}
+                <span>{isListening ? 'Stoppen' : 'Sprache'}</span>
+              </motion.button>
+            ) : (
+              <div
+                className="flex items-center justify-center gap-3 rounded-2xl px-4 py-4 text-sm font-semibold text-slate-600 border border-white/5 cursor-not-allowed"
+                style={{ background: 'rgba(255,255,255,0.02)' }}
+                title="Sprachsuche benötigt Chrome, Edge oder Safari"
+              >
+                <Mic className="w-5 h-5 flex-shrink-0" />
+                <span>Sprache</span>
+              </div>
+            )}
+            <button
+              onClick={() => setShowScanner(true)}
+              className="flex items-center justify-center gap-3 rounded-2xl px-4 py-4 text-sm font-semibold text-slate-300 hover:text-led-cyan border border-white/10 hover:border-led-cyan/30 hover:bg-led-cyan/5 transition-all duration-200 select-none"
+              style={{ background: 'rgba(255,255,255,0.04)' }}
+              title="Barcode / QR-Code scannen"
+            >
+              <ScanLine className="w-5 h-5 flex-shrink-0" />
+              <span>Scanner</span>
+            </button>
+          </div>
         </div>
 
         {/* Results */}

@@ -1,7 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { LayoutGrid, Search, Settings } from 'lucide-react';
-import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -11,14 +9,6 @@ const navItems = [
 ];
 
 export default function Sidebar() {
-  const { data: mqttStatus } = useQuery({
-    queryKey: ['mqtt-status'],
-    queryFn: api.wled.status,
-    refetchInterval: 8000,
-  });
-
-  const isConnected = mqttStatus?.status === 'connected';
-
   return (
     <aside
       className="w-16 lg:w-56 flex flex-col h-screen flex-shrink-0"
@@ -77,27 +67,6 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* MQTT Status */}
-      <div
-        className="mx-2 mb-4 px-3 py-2.5 rounded-lg"
-        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-subtle)' }}
-      >
-        <div className="flex items-center gap-2">
-          <div
-            className={cn(
-              'w-2 h-2 rounded-full flex-shrink-0',
-              isConnected ? 'bg-emerald-400' : 'bg-slate-600'
-            )}
-            style={isConnected ? { boxShadow: '0 0 6px rgba(52,211,153,0.8)' } : {}}
-          />
-          <div className="hidden lg:block overflow-hidden">
-            <p className="text-xs font-medium leading-tight" style={{ color: 'var(--text-secondary)' }}>MQTT Broker</p>
-            <p className={cn('text-xs font-medium leading-tight', isConnected ? 'text-emerald-400' : 'text-slate-400')}>
-              {isConnected ? 'Verbunden' : 'Getrennt'}
-            </p>
-          </div>
-        </div>
-      </div>
     </aside>
   );
 }
